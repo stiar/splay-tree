@@ -8,39 +8,92 @@
 
 namespace splay_tree {
 
-template <typename Key>
+template <
+    typename Key,
+    typename Allocator = std::allocator<Key>
+>
 class SplayTree {
 public:
     typedef Key key_type;
+    typedef key_type* pointer;
+    typedef const key_type* const_pointer;
+    typedef key_type& reference;
+    typedef const key_type& const_reference;
+    typedef size_t size_type;
+    typedef ptrdiff_t difference_type;
+    typedef Allocator allocator_type;
 
 private:
     struct SplayTreeNode {
-        explicit SplayTreeNode(const Key& key) :
+        explicit SplayTreeNode(const key_type& key) :
             key(key),
             parent(nullptr),
             leftSon(nullptr),
             rightSon(nullptr) {
         }
 
-        Key key;
+        key_type key;
         SplayTreeNode* parent;
         SplayTreeNode* leftSon;
         SplayTreeNode* rightSon;
     };
 
-    static SplayTreeNode* createNode(const Key& key) {
-        return new SplayTreeNode(key);
+    // TODO: what is going on here?
+    typedef
+        typename Allocator::template rebind<SplayTreeNode>::other
+        NodeAllocator;
+
+    SplayTreeNode* allocateNode() {
+        return nodeAllocator_.allocate(1);
+    }
+
+    void deallocateNode(SplayTreeNode* node) {
+        nodeAllocator_.deallocate(node, 1);
+    }
+
+    SplayTreeNode* createNode(const key_type& key) {
+        SplayTreeNode* newNode = allocateNode();
+        try {
+            nodeAllocator_.construct(newNode, key);
+        } catch (...) {
+            deallocateNode(newNode);
+            throw;
+        }
+        return newNode;
+    }
+
+    void destroyNode(SplayTreeNode* node) {
+        nodeAllocator_.destroy(node);
+        deallocateNode(node);
+    }
+
+    // TODO: get rid of recursion
+    void destroy(SplayTreeNode* node) {
+        assert(node);
+        if (node->leftSon) {
+            destroy(node->leftSon);
+        }
+        if (node->rightSon) {
+            destroy(node->rightSon);
+        }
+        destroyNode(node);
     }
 
     template<bool IsConstIterator>
     class SplayTreeIterator {
     public:
-        typedef Key value_type;
+        typedef key_type value_type;
         typedef
-            typename std::conditional<IsConstIterator, const Key&, Key&>::type
+            typename std::conditional<
+                IsConstIterator,
+                const key_type&,
+                key_type&>::type
             reference; 
         typedef
-            typename std::conditional<IsConstIterator, const Key*, Key*>::type
+            typename std::conditional<
+                IsConstIterator,
+                const key_type*,
+                key_type*>::type
             pointer;
         typedef ptrdiff_t difference_type;
         typedef std::bidirectional_iterator_tag iterator_category;
@@ -140,18 +193,6 @@ private:
         SplayTreeNode* root_;
     };
 
-    // TODO: get rid of recursion
-    void destroy(SplayTreeNode* node) {
-        assert(node);
-        if (node->leftSon) {
-            destroy(node->leftSon);
-        }
-        if (node->rightSon) {
-            destroy(node->rightSon);
-        }
-        delete node;
-    }
-
     SplayTreeNode* getLeftMostNode() const {
         SplayTreeNode* currentNode = root_;
         while (currentNode && currentNode->leftSon) {
@@ -177,10 +218,22 @@ public:
         root_(nullptr) {
     }
 
+    SplayTree(const SplayTree& rhs) {
+        // TODO
+    }
+
+    SplayTree(SplayTree&& rhs) {
+        // TODO
+    }
+
     ~SplayTree() {
         if (root_) {
             destroy(root_);
         }
+    }
+
+    SplayTree& operator=(const SplayTree& rhs) {
+        // TODO
     }
 
     iterator begin() {
@@ -208,7 +261,7 @@ public:
     }
 
 private:
-    SplayTreeNode* innerLowerBound(const Key& key) const {
+    SplayTreeNode* innerLowerBound(const key_type& key) const {
         SplayTreeNode* currentNode = root_;
         SplayTreeNode* lowerBound = root_;
         while (currentNode) {
@@ -225,7 +278,7 @@ private:
         return lowerBound;
     }
 
-    SplayTreeNode* findPlaceToInsert(const Key& key) const {
+    SplayTreeNode* findPlaceToInsert(const key_type& key) const {
         SplayTreeNode* currentNode = root_;
         while (currentNode) {
             if (currentNode->key == key) {
@@ -248,7 +301,7 @@ private:
         return currentNode;
     }
 
-    SplayTreeNode* innerFind(const Key& key) const {
+    SplayTreeNode* innerFind(const key_type& key) const {
         SplayTreeNode* placeToInsert = findPlaceToInsert(key);
         if (placeToInsert && placeToInsert->key == key) {
             return placeToInsert;
@@ -258,23 +311,28 @@ private:
     }
 
 public:
-    iterator lower_bound(const Key& key) {
+    iterator lower_bound(const key_type& key) {
         return iterator(innerLowerBound(key), root_);
     }
 
-    const_iterator lower_bound(const Key& key) const {
+    const_iterator lower_bound(const key_type& key) const {
         return const_iterator(innerLowerBound(key), root_);
     }
 
-    iterator find(const Key& key) {
+    iterator find(const key_type& key) {
         return iterator(innerFind(key), root_);
     }
 
-    const_iterator find(const Key& key) const {
+    const_iterator find(const key_type& key) const {
         return const_iterator(innerFind(key), root_);
     }
 
-    std::pair<iterator, bool> insert(const Key& key) {
+    void clear() {
+        destroy();
+        root_ = nullptr;
+    }
+
+    std::pair<iterator, bool> insert(const key_type& key) {
         if (!root_) {
             root_ = createNode(key);
             return {iterator(root_, root_), true};
@@ -298,7 +356,12 @@ public:
         // TODO Run splay
     }
 
-    size_t count(const Key& key) const {
+    template<typename... Args>
+    std::pair<iterator, bool> emplace(Args&&... args) {
+        // TODO
+    }
+
+    size_type count(const key_type& key) const {
         SplayTreeNode* placeToInsert = findPlaceToInsert(key);
         if (placeToInsert && placeToInsert->key == key) {
             return 1;
@@ -311,12 +374,17 @@ public:
         return !root_;
     }
 
+    size_type size() const {
+        // TODO
+    }
+
     void swap(SplayTree& rhs) {
         swap(root_, rhs.root_);
     }
 
 private:
     SplayTreeNode* root_;
+    NodeAllocator nodeAllocator_;
 };
 
 } // splay_tree
