@@ -10,6 +10,7 @@ namespace splay_tree {
 
 template <
     typename Key,
+    typename Compare = std::less<Key>,
     typename Allocator = std::allocator<Key>
 >
 class SplayTree {
@@ -59,6 +60,8 @@ private:
             deallocateNode(newNode);
             throw;
         }
+        // TODO: is it an appropriate place?
+        ++numberOfNodes_;
         return newNode;
     }
 
@@ -117,27 +120,7 @@ private:
             return !(*this == rhs);
         }
 
-        SplayTreeIterator& operator++() {
-            if (node_) {
-                SplayTreeNode* currentNode = node_;
-
-                if (currentNode->rightSon) {
-                    currentNode = currentNode->rightSon;
-                    while (currentNode->leftSon) {
-                        currentNode = currentNode->leftSon;
-                    }
-                    node_ = currentNode;
-                } else {
-                    while (currentNode->parent &&
-                            currentNode->parent->rightSon == currentNode) {
-                        currentNode = currentNode->parent;
-                    }
-                    node_ = currentNode->parent;
-                }
-            }
-
-            return *this;
-        }
+        SplayTreeIterator& operator++();
 
         SplayTreeIterator operator++(int) {
             const SplayTreeIterator old(*this);
@@ -145,32 +128,7 @@ private:
             return old;
         }
 
-        SplayTreeIterator& operator--() {
-            if (!node_) {
-                SplayTreeNode* currentNode = root_;
-                while (currentNode && currentNode->rightSon) {
-                    currentNode = currentNode->rightSon;
-                }
-                node_ = currentNode;
-            } else {
-                SplayTreeNode* currentNode = node_;
-
-                if (currentNode->leftSon) {
-                    currentNode = currentNode->leftSon;
-                    while (currentNode->rightSon) {
-                        currentNode = currentNode->rightSon;
-                    }
-                    node_ = currentNode;
-                } else {
-                    while (currentNode->parent &&
-                            currentNode->parent->leftSon == currentNode) {
-                        currentNode = currentNode->parent;
-                    }
-                    node_ = currentNode->parent;
-                }
-            }
-            return *this;
-        }
+        SplayTreeIterator& operator--();
 
         SplayTreeIterator operator--(int) {
             const SplayTreeIterator old(*this);
@@ -193,38 +151,20 @@ private:
         SplayTreeNode* root_;
     };
 
-    SplayTreeNode* getLeftMostNode() const {
-        SplayTreeNode* currentNode = root_;
-        while (currentNode && currentNode->leftSon) {
-            currentNode = currentNode->leftSon;
-        }
-        return currentNode;
-    }
-
-    SplayTreeNode* getRightMostNode() const {
-        SplayTreeNode* currentNode = root_;
-        while (currentNode && currentNode->rightSon) {
-            currentNode = currentNode->rightSon;
-        }
-        return currentNode;
-    }
-
-
 public:
     typedef SplayTreeIterator<false> iterator;
     typedef SplayTreeIterator<true> const_iterator;
 
     SplayTree() :
-        root_(nullptr) {
+        root_(nullptr),
+        numberOfNodes_(0) {
     }
 
-    SplayTree(const SplayTree& rhs) {
-        // TODO
-    }
+    // TODO
+    SplayTree(const SplayTree& rhs);
 
-    SplayTree(SplayTree&& rhs) {
-        // TODO
-    }
+    // TODO
+    SplayTree(SplayTree&& rhs);
 
     ~SplayTree() {
         if (root_) {
@@ -232,9 +172,8 @@ public:
         }
     }
 
-    SplayTree& operator=(const SplayTree& rhs) {
-        // TODO
-    }
+    // TODO
+    SplayTree& operator=(const SplayTree& rhs);
 
     iterator begin() {
         return iterator(getLeftMostNode(), root_);
@@ -260,57 +199,6 @@ public:
         return {nullptr, root_};
     }
 
-private:
-    SplayTreeNode* innerLowerBound(const key_type& key) const {
-        SplayTreeNode* currentNode = root_;
-        SplayTreeNode* lowerBound = root_;
-        while (currentNode) {
-            if (currentNode->key == key) {
-                return currentNode;
-            }
-            if (currentNode->key > key) {
-                lowerBound = currentNode;
-                currentNode = currentNode->leftSon;
-            } else {
-                currentNode = currentNode->rightSon;
-            }
-        }
-        return lowerBound;
-    }
-
-    SplayTreeNode* findPlaceToInsert(const key_type& key) const {
-        SplayTreeNode* currentNode = root_;
-        while (currentNode) {
-            if (currentNode->key == key) {
-                return currentNode;
-            }
-            if (currentNode->key > key) {
-                if (!currentNode->leftSon) {
-                    return currentNode;
-                } else {
-                    currentNode = currentNode->leftSon;
-                }
-            } else {
-                if (!currentNode->rightSon) {
-                    return currentNode;
-                } else {
-                    currentNode = currentNode->rightSon;
-                }
-            }
-        }
-        return currentNode;
-    }
-
-    SplayTreeNode* innerFind(const key_type& key) const {
-        SplayTreeNode* placeToInsert = findPlaceToInsert(key);
-        if (placeToInsert && placeToInsert->key == key) {
-            return placeToInsert;
-        } else {
-            return nullptr;
-        }
-    }
-
-public:
     iterator lower_bound(const key_type& key) {
         return iterator(innerLowerBound(key), root_);
     }
@@ -332,60 +220,216 @@ public:
         root_ = nullptr;
     }
 
-    std::pair<iterator, bool> insert(const key_type& key) {
-        if (!root_) {
-            root_ = createNode(key);
-            return {iterator(root_, root_), true};
-        }
-        // Find appropriate place for the new key.
-        SplayTreeNode* placeToInsert = findPlaceToInsert(key);
-        assert(placeToInsert);
-
-        if (placeToInsert->key == key) {
-            return {iterator(placeToInsert, root_), false};
-        }
-
-        SplayTreeNode* newNode = createNode(key);
-        newNode->parent = placeToInsert;
-        if (placeToInsert->key > key) {
-            placeToInsert->leftSon = newNode;
-        } else {
-            placeToInsert->rightSon = newNode;
-        }
-        return {iterator(newNode, root_), true};
-        // TODO Run splay
-    }
+    std::pair<iterator, bool> insert(const key_type& key);
 
     template<typename... Args>
     std::pair<iterator, bool> emplace(Args&&... args) {
+        assert(false);
         // TODO
     }
 
-    size_type count(const key_type& key) const {
-        SplayTreeNode* placeToInsert = findPlaceToInsert(key);
-        if (placeToInsert && placeToInsert->key == key) {
-            return 1;
-        } else {
-            return 0;
-        }
-    }
+    size_type count(const key_type& key) const;
 
     bool empty() const {
         return !root_;
     }
 
     size_type size() const {
-        // TODO
+        return numberOfNodes_;
     }
 
     void swap(SplayTree& rhs) {
         swap(root_, rhs.root_);
+        swap(numberOfNodes_, rhs.numberOfNodes_);
     }
 
 private:
+    SplayTreeNode* getLeftMostNode() const;
+
+    SplayTreeNode* getRightMostNode() const;
+
+    SplayTreeNode* innerLowerBound(const key_type& key) const;
+
+    SplayTreeNode* findPlaceToInsert(const key_type& key) const;
+
+    SplayTreeNode* innerFind(const key_type& key) const;
+
     SplayTreeNode* root_;
+    size_type numberOfNodes_;
     NodeAllocator nodeAllocator_;
 };
+
+template <typename Key, typename Compare, typename Allocator>
+template <bool IsConstIterator>
+typename SplayTree<Key, Compare, Allocator>::template SplayTreeIterator<IsConstIterator>&
+SplayTree<Key, Compare, Allocator>::SplayTreeIterator<IsConstIterator>::operator++() {
+    if (node_) {
+        SplayTreeNode* currentNode = node_;
+
+        if (currentNode->rightSon) {
+            currentNode = currentNode->rightSon;
+            while (currentNode->leftSon) {
+                currentNode = currentNode->leftSon;
+            }
+            node_ = currentNode;
+        } else {
+            while (currentNode->parent &&
+                    currentNode->parent->rightSon == currentNode) {
+                currentNode = currentNode->parent;
+            }
+            node_ = currentNode->parent;
+        }
+    }
+
+    return *this;
+}
+
+template <typename Key, typename Compare, typename Allocator>
+template <bool IsConstIterator>
+typename SplayTree<Key, Compare, Allocator>::template SplayTreeIterator<IsConstIterator>&
+SplayTree<Key, Compare, Allocator>::SplayTreeIterator<IsConstIterator>::operator--() {
+    if (!node_) {
+        SplayTreeNode* currentNode = root_;
+        while (currentNode && currentNode->rightSon) {
+            currentNode = currentNode->rightSon;
+        }
+        node_ = currentNode;
+    } else {
+        SplayTreeNode* currentNode = node_;
+
+        if (currentNode->leftSon) {
+            currentNode = currentNode->leftSon;
+            while (currentNode->rightSon) {
+                currentNode = currentNode->rightSon;
+            }
+            node_ = currentNode;
+        } else {
+            while (currentNode->parent &&
+                    currentNode->parent->leftSon == currentNode) {
+                currentNode = currentNode->parent;
+            }
+            node_ = currentNode->parent;
+        }
+    }
+    return *this;
+}
+
+template <typename Key, typename Compare, typename Allocator>
+typename SplayTree<Key, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Compare, Allocator>::getLeftMostNode() const {
+    SplayTreeNode* currentNode = root_;
+    while (currentNode && currentNode->leftSon) {
+        currentNode = currentNode->leftSon;
+    }
+    return currentNode;
+}
+
+template <typename Key, typename Compare, typename Allocator>
+typename SplayTree<Key, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Compare, Allocator>::getRightMostNode() const {
+    SplayTreeNode* currentNode = root_;
+    while (currentNode && currentNode->rightSon) {
+        currentNode = currentNode->rightSon;
+    }
+    return currentNode;
+}
+
+template <typename Key, typename Compare, typename Allocator>
+typename SplayTree<Key, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Compare, Allocator>::innerLowerBound(
+        const SplayTree<Key, Compare, Allocator>::key_type& key) const {
+    SplayTreeNode* currentNode = root_;
+    SplayTreeNode* lowerBound = root_;
+    while (currentNode) {
+        if (currentNode->key == key) {
+            return currentNode;
+        }
+        if (currentNode->key > key) {
+            lowerBound = currentNode;
+            currentNode = currentNode->leftSon;
+        } else {
+            currentNode = currentNode->rightSon;
+        }
+    }
+    return lowerBound;
+}
+
+template <typename Key, typename Compare, typename Allocator>
+typename SplayTree<Key, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Compare, Allocator>::findPlaceToInsert(
+        const SplayTree<Key, Compare, Allocator>::key_type& key) const {
+    SplayTreeNode* currentNode = root_;
+    while (currentNode) {
+        if (currentNode->key == key) {
+            return currentNode;
+        }
+        if (currentNode->key > key) {
+            if (!currentNode->leftSon) {
+                return currentNode;
+            } else {
+                currentNode = currentNode->leftSon;
+            }
+        } else {
+            if (!currentNode->rightSon) {
+                return currentNode;
+            } else {
+                currentNode = currentNode->rightSon;
+            }
+        }
+    }
+    return currentNode;
+}
+
+template <typename Key, typename Compare, typename Allocator>
+typename SplayTree<Key, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Compare, Allocator>::innerFind(
+        const SplayTree<Key, Compare, Allocator>::key_type& key) const {
+    SplayTreeNode* placeToInsert = findPlaceToInsert(key);
+    if (placeToInsert && placeToInsert->key == key) {
+        return placeToInsert;
+    } else {
+        return nullptr;
+    }
+}
+
+template <typename Key, typename Compare, typename Allocator>
+std::pair<typename SplayTree<Key, Compare, Allocator>::iterator, bool>
+SplayTree<Key, Compare, Allocator>::insert(
+        const SplayTree<Key, Compare, Allocator>::key_type& key) {
+    if (!root_) {
+        root_ = createNode(key);
+        return {iterator(root_, root_), true};
+    }
+
+    SplayTreeNode* placeToInsert = findPlaceToInsert(key);
+    assert(placeToInsert);
+
+    if (placeToInsert->key == key) {
+        return {iterator(placeToInsert, root_), false};
+    }
+
+    SplayTreeNode* newNode = createNode(key);
+    newNode->parent = placeToInsert;
+    if (placeToInsert->key > key) {
+        placeToInsert->leftSon = newNode;
+    } else {
+        placeToInsert->rightSon = newNode;
+    }
+    // TODO Run splay
+    return {iterator(newNode, root_), true};
+}
+
+template <typename Key, typename Compare, typename Allocator>
+typename SplayTree<Key, Compare, Allocator>::size_type
+SplayTree<Key, Compare, Allocator>::count(
+        const SplayTree<Key, Compare, Allocator>::key_type& key) const {
+    SplayTreeNode* placeToInsert = findPlaceToInsert(key);
+    if (placeToInsert && placeToInsert->key == key) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
 
 } // splay_tree
 

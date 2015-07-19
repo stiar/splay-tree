@@ -35,4 +35,6 @@ int main() {
     ++it;
     --it;
     std::cout << *it << "\n";
+
+    return 0;
 }
