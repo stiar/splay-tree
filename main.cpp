@@ -1,40 +1,33 @@
 #include "splay-tree.h"
 
 #include <iostream>
+#include <string>
+#include <sstream>
+#include <set>
 
 int main() {
-    splay_tree::SplayTree<int> a;
-    a.insert(2);
-    a.insert(1);
-    a.insert(4);
-    a.insert(3);
-    a.insert(5);
-    std::cout << a.count(1) << "\n";
-    std::cout << a.count(2) << "\n";
-    std::cout << a.count(3) << "\n";
-    std::cout << a.count(4) << "\n";
-
-    std::cout << "\n";
-
-    for (const auto& x : a) {
-        std::cout << x << "\n";
+    std::string s;
+    splay_tree::SplayTree<int> splayTree;
+    std::set<int> set;
+    while (getline(std::cin, s)) {
+        std::stringstream stream(s);
+        std::string command;
+        stream >> command;
+        if (command == "count") {
+            assert(splayTree.size() == set.size());
+        }
+        if (command == "insert") {
+            int value;
+            stream >> value;
+            splayTree.insert(value);
+            set.insert(value);
+        }
+        if (command == "check") {
+            int value;
+            stream >> value;
+            assert(splayTree.count(value) == set.count(value));
+        }
     }
-
-    std::cout << "\n";
-    auto it = a.begin();
-    std::cout << *it << "\n";
-    ++it;
-    std::cout << *it << "\n";
-    ++it;
-    std::cout << *it << "\n";
-    --it;
-    std::cout << *it << "\n";
-    ++it;
-    ++it;
-    ++it;
-    ++it;
-    --it;
-    std::cout << *it << "\n";
 
     return 0;
 }

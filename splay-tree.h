@@ -5,6 +5,7 @@
 #include <type_traits>
 #include <cstddef>
 #include <cassert>
+#include <iostream>
 
 namespace splay_tree {
 
@@ -222,11 +223,9 @@ public:
 
     std::pair<iterator, bool> insert(const key_type& key);
 
+    // TODO
     template<typename... Args>
-    std::pair<iterator, bool> emplace(Args&&... args) {
-        assert(false);
-        // TODO
-    }
+    std::pair<iterator, bool> emplace(Args&&... args);
 
     size_type count(const key_type& key) const;
 
@@ -244,6 +243,18 @@ public:
     }
 
 private:
+    SplayTreeNode* splay(SplayTreeNode* node);
+
+    SplayTreeNode* zigStep(SplayTreeNode* node);
+
+    SplayTreeNode* zigZigStep(SplayTreeNode* node);
+
+    SplayTreeNode* zigZagStep(SplayTreeNode* node);
+
+    SplayTreeNode* leftRotation(SplayTreeNode* node);
+
+    SplayTreeNode* rightRotation(SplayTreeNode* node);
+
     SplayTreeNode* getLeftMostNode() const;
 
     SplayTreeNode* getRightMostNode() const;
@@ -253,6 +264,9 @@ private:
     SplayTreeNode* findPlaceToInsert(const key_type& key) const;
 
     SplayTreeNode* innerFind(const key_type& key) const;
+
+    // For debugging purposes.
+    void printTree(std::ostream& os, SplayTreeNode* node) const;
 
     SplayTreeNode* root_;
     size_type numberOfNodes_;
@@ -312,6 +326,125 @@ SplayTree<Key, Compare, Allocator>::SplayTreeIterator<IsConstIterator>::operator
         }
     }
     return *this;
+}
+
+template <typename Key, typename Compare, typename Allocator>
+typename SplayTree<Key, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Compare, Allocator>::splay(SplayTreeNode* node) {
+    while (node != root_) {
+        if (node->parent == root_) {
+            node = zigStep(node);
+            assert(!node->parent);
+            root_ = node;
+        } else {
+            SplayTreeNode* parent = node->parent;
+            SplayTreeNode* grandParent = parent->parent;
+
+            if ((grandParent->leftSon == parent) == (parent->leftSon == node)) {
+                node = zigZigStep(node);
+            } else {
+                node = zigZagStep(node);
+            }
+            if (!node->parent) {
+                root_ = node;
+            }
+        }
+    }
+
+    assert(!node->parent);
+    return node;
+}
+
+template <typename Key, typename Compare, typename Allocator>
+typename SplayTree<Key, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Compare, Allocator>::zigStep(SplayTreeNode* node) {
+    if (node->parent->leftSon == node) {
+        return rightRotation(node);
+    } else {
+        return leftRotation(node);
+    }
+}
+
+template <typename Key, typename Compare, typename Allocator>
+typename SplayTree<Key, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Compare, Allocator>::zigZigStep(SplayTreeNode* node) {
+    SplayTreeNode* parent = node->parent;
+    if (parent->leftSon == node) {
+        parent = rightRotation(parent);
+        node = parent->leftSon;
+        return rightRotation(node);
+    } else {
+        parent = leftRotation(parent);
+        node = parent->rightSon;
+        return leftRotation(node);
+    }
+}
+
+template <typename Key, typename Compare, typename Allocator>
+typename SplayTree<Key, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Compare, Allocator>::zigZagStep(SplayTreeNode* node) {
+    SplayTreeNode* parent = node->parent;
+    if (parent->leftSon == node) {
+        node = rightRotation(node);
+        return leftRotation(node);
+    } else {
+        node = leftRotation(node);
+        return rightRotation(node);
+    }
+}
+
+template <typename Key, typename Compare, typename Allocator>
+typename SplayTree<Key, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Compare, Allocator>::leftRotation(SplayTreeNode* node) {
+    SplayTreeNode* parent = node->parent;
+    assert(parent);
+    assert(parent->rightSon == node);
+    SplayTreeNode* grandParent = parent->parent;
+
+    parent->rightSon = node->leftSon;
+    if (node->leftSon) {
+        node->leftSon->parent = parent;
+    }
+
+    node->leftSon = parent;
+    node->parent = grandParent;
+    if (grandParent) {
+        if (grandParent->leftSon == parent) {
+            grandParent->leftSon = node;
+        } else {
+            grandParent->rightSon = node;
+        }
+    }
+    parent->parent = node;
+
+    return node;
+}
+
+template <typename Key, typename Compare, typename Allocator>
+typename SplayTree<Key, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Compare, Allocator>::rightRotation(SplayTreeNode* node) {
+    SplayTreeNode* parent = node->parent;
+    assert(parent);
+    assert(parent->leftSon == node);
+    SplayTreeNode* grandParent = parent->parent;
+
+    parent->leftSon = node->rightSon;
+    if (node->rightSon) {
+        node->rightSon->parent = parent;
+    }
+
+    node->rightSon = parent;
+    node->parent = grandParent;
+    if (grandParent) {
+        if (grandParent->leftSon == parent) {
+            grandParent->leftSon = node;
+        } else {
+            grandParent->rightSon = node;
+        }
+    }
+    parent->parent = node;
+
+    return node;
 }
 
 template <typename Key, typename Compare, typename Allocator>
@@ -415,7 +548,11 @@ SplayTree<Key, Compare, Allocator>::insert(
     } else {
         placeToInsert->rightSon = newNode;
     }
-    // TODO Run splay
+
+    newNode = splay(newNode);
+    assert(root_ == newNode);
+    //printTree(std::cerr, root_);
+    //std::cerr << "\n";
     return {iterator(newNode, root_), true};
 }
 
@@ -429,6 +566,31 @@ SplayTree<Key, Compare, Allocator>::count(
     } else {
         return 0;
     }
+}
+
+template <typename Key, typename Compare, typename Allocator>
+void SplayTree<Key, Compare, Allocator>::printTree(
+        std::ostream& os,
+        SplayTree<Key, Compare, Allocator>::SplayTreeNode* node) const {
+    if (!node) {
+        return;
+    }
+    if (node != root_) {
+        os << " ";
+    }
+    os << node->key << "[";
+    if (node->leftSon) {
+        assert(node->leftSon->parent == node);
+        os << node->leftSon->key;
+    }
+    os << ",";
+    if (node->rightSon) {
+        assert(node->rightSon->parent == node);
+        os << node->rightSon->key;
+    }
+    os << "]";
+    printTree(os, node->leftSon);
+    printTree(os, node->rightSon);
 }
 
 } // splay_tree
