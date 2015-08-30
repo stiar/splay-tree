@@ -40,7 +40,6 @@ private:
         SplayTreeNode* rightSon;
     };
 
-    // TODO: what is going on here?
     typedef
         typename Allocator::template rebind<SplayTreeNode>::other
         NodeAllocator;
@@ -69,6 +68,7 @@ private:
     void destroyNode(SplayTreeNode* node) {
         nodeAllocator_.destroy(node);
         deallocateNode(node);
+        --numberOfNodes;
     }
 
     // TODO: get rid of recursion
@@ -168,13 +168,14 @@ public:
     SplayTree(SplayTree&& rhs);
 
     ~SplayTree() {
-        if (root_) {
-            destroy(root_);
-        }
+        clear();
     }
 
     // TODO
     SplayTree& operator=(const SplayTree& rhs);
+
+    // TODO
+    SplayTree& operator=(SplayTree&& rhs);
 
     iterator begin() {
         return iterator(getLeftMostNode(), root_);
@@ -217,8 +218,10 @@ public:
     }
 
     void clear() {
-        destroy();
-        root_ = nullptr;
+        if (root_) {
+            destroy();
+            root_ = nullptr;
+        }
     }
 
     std::pair<iterator, bool> insert(const key_type& key);
