@@ -60,8 +60,7 @@ private:
             deallocateNode(newNode);
             throw;
         }
-        // TODO: is it an appropriate place?
-        ++numberOfNodes_;
+
         return newNode;
     }
 
@@ -185,19 +184,11 @@ public:
         return const_iterator(getLeftMostNode(), root_);
     }
     
-    const_iterator cbegin() const {
-        return const_iterator(getLeftMostNode(), root_);
-    }
-
     iterator end() {
         return {nullptr, root_};
     }
 
     const_iterator end() const {
-        return {nullptr, root_};
-    }
-    
-    const_iterator cend() const {
         return {nullptr, root_};
     }
 
@@ -267,9 +258,6 @@ private:
     SplayTreeNode* findPlaceToInsert(const key_type& key) const;
 
     SplayTreeNode* innerFind(const key_type& key) const;
-
-    // For debugging purposes.
-    void printTree(std::ostream& os, SplayTreeNode* node) const;
 
     SplayTreeNode* root_;
     size_type numberOfNodes_;
@@ -554,8 +542,9 @@ SplayTree<Key, Compare, Allocator>::insert(
 
     newNode = splay(newNode);
     assert(root_ == newNode);
-    //printTree(std::cerr, root_);
-    //std::cerr << "\n";
+
+    ++numberOfNodes_;
+
     return {iterator(newNode, root_), true};
 }
 
@@ -569,31 +558,6 @@ SplayTree<Key, Compare, Allocator>::count(
     } else {
         return 0;
     }
-}
-
-template <typename Key, typename Compare, typename Allocator>
-void SplayTree<Key, Compare, Allocator>::printTree(
-        std::ostream& os,
-        SplayTree<Key, Compare, Allocator>::SplayTreeNode* node) const {
-    if (!node) {
-        return;
-    }
-    if (node != root_) {
-        os << " ";
-    }
-    os << node->key << "[";
-    if (node->leftSon) {
-        assert(node->leftSon->parent == node);
-        os << node->leftSon->key;
-    }
-    os << ",";
-    if (node->rightSon) {
-        assert(node->rightSon->parent == node);
-        os << node->rightSon->key;
-    }
-    os << "]";
-    printTree(os, node->leftSon);
-    printTree(os, node->rightSon);
 }
 
 } // splay_tree
