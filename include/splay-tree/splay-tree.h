@@ -68,7 +68,7 @@ private:
     void destroyNode(SplayTreeNode* node) {
         nodeAllocator_.destroy(node);
         deallocateNode(node);
-        --numberOfNodes;
+        --numberOfNodes_;
     }
 
     // TODO: get rid of recursion
@@ -219,7 +219,7 @@ public:
 
     void clear() {
         if (root_) {
-            destroy();
+            destroy(root_);
             root_ = nullptr;
         }
     }
