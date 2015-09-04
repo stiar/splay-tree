@@ -14,4 +14,7 @@ else()
     message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support.")
 endif()
 
-add_executable(splay-tree-demo src/splay-tree-demo.cpp)
+enable_testing()
+
+add_subdirectory(src)
+add_subdirectory(test)
