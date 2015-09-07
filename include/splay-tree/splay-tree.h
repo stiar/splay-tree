@@ -13,6 +13,7 @@ template <
     typename Key,
     typename Value,
     typename KeyOfValue,
+    // TODO Custom comparators are ignored so far.
     typename Compare,
     typename Allocator = std::allocator<Value>
 >
@@ -29,6 +30,8 @@ public:
     typedef Allocator allocator_type;
 
 private:
+    // TODO Split this struct into a non-template base class and a derived class
+    //      consisting of value (and maybe something else?).
     struct SplayTreeNode {
         template<typename... Args>
         SplayTreeNode(Args&&... args) :
