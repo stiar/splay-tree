@@ -5,7 +5,7 @@
 #include <sstream>
 
 int main() {
-    splay_tree::SplayTree<int> set;
+    splay_tree::SplayTree<int, int, int, std::less<int>> set;
     std::string command;
     while (getline(std::cin, command)) {
         std::stringstream stream(command);
@@ -15,7 +15,7 @@ int main() {
         if (commandName == "insert") {
             int value;
             stream >> value;
-            set.insert(value);
+            set.insertUnique(value);
         }
         if (commandName == "count") {
             int value;
