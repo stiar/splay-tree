@@ -340,6 +340,9 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeIterator<IsConst
             }
             node_ = currentNode;
         } else {
+            // TODO Because of the check currentNode->parent operator++ runs a
+            //      bit slower than the corresponding one in STL. Should think
+            //      about how to fix it (can a fake root help?)
             while (currentNode->parent &&
                     currentNode->parent->rightSon == currentNode) {
                 currentNode = currentNode->parent;
