@@ -400,6 +400,7 @@ std::pair<typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::iterat
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::insertUnique(Arg&& value) {
     if (!root_) {
         root_ = createNode(std::forward<Arg>(value));
+        ++numberOfNodes_;
         leftMostNode_ = root_;
         rightMostNode_ = root_;
         return {iterator(root_, root_), true};
