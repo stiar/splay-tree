@@ -184,7 +184,7 @@ public:
     SplayTree& operator=(const SplayTree& rhs);
 
     // TODO
-    SplayTree& operator=(SplayTree&& rhs);
+    SplayTree& operator=(SplayTree&& rhs) noexcept;
 
     iterator begin() noexcept {
         return iterator(leftMostNode_, root_);
@@ -311,6 +311,9 @@ private:
 
     SplayTreeNode* innerFind(const key_type& key) const;
 
+    template<typename Arg>
+    SplayTreeNode* innerInsert(Arg&& value, SplayTreeNode* placeToInsert);
+
     SplayTreeNode* root_{nullptr};
     SplayTreeNode* leftMostNode_{nullptr};
     SplayTreeNode* rightMostNode_{nullptr};
@@ -390,7 +393,6 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeIterator<IsConst
     return *this;
 }
 
-// TODO Remove code duplication in inserts.
 template<
     typename Key,
     typename Value,
@@ -401,42 +403,15 @@ template<
 template<typename Arg>
 std::pair<typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::iterator, bool>
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::insertUnique(Arg&& value) {
-    if (!root_) {
-        root_ = createNode(std::forward<Arg>(value));
-        ++numberOfNodes_;
-        leftMostNode_ = root_;
-        rightMostNode_ = root_;
-        return {iterator(root_, root_), true};
-    }
-
     const auto& key = KeyOfValue(value);
     SplayTreeNode* placeToInsert = findPlaceToInsert(key);
-    assert(placeToInsert);
 
-    if (KeyOfValue(placeToInsert->value) == key) {
+    if (placeToInsert && KeyOfValue(placeToInsert->value) == key) {
         return {iterator(placeToInsert, root_), false};
-    }
-
-    SplayTreeNode* newNode = createNode(std::forward<Arg>(value));
-    newNode->parent = placeToInsert;
-    if (KeyOfValue(placeToInsert->value) < key) {
-        placeToInsert->rightSon = newNode;
-        if (placeToInsert == rightMostNode_) {
-            rightMostNode_ = newNode;
-        }
     } else {
-        placeToInsert->leftSon = newNode;
-        if (placeToInsert == leftMostNode_) {
-            leftMostNode_ = newNode;
-        }
+        auto newNode = innerInsert(std::forward<Arg>(value), placeToInsert);
+        return {iterator(newNode, root_), true};
     }
-
-    newNode = splay(newNode);
-    assert(root_ == newNode);
-
-    ++numberOfNodes_;
-
-    return {iterator(newNode, root_), true};
 }
 
 template<
@@ -449,30 +424,10 @@ template<
 template<typename Arg>
 typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::iterator
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::insertEqual(Arg&& value) {
-    if (!root_) {
-        root_ = createNode(std::forward<Arg>(value));
-        leftMostNode_ = root_;
-        rightMostNode_ = root_;
-        return {iterator(root_, root_), true};
-    }
-
     const auto& key = KeyOfValue(value);
     SplayTreeNode* placeToInsert = findPlaceToInsert(key);
-    assert(placeToInsert);
 
-    SplayTreeNode* newNode = createNode(std::forward<Arg>(value));
-    newNode->parent = placeToInsert;
-    if (KeyOfValue(placeToInsert->value) < key) {
-        placeToInsert->rightSon = newNode;
-    } else {
-        placeToInsert->leftSon = newNode;
-    }
-
-    newNode = splay(newNode);
-    assert(root_ == newNode);
-
-    ++numberOfNodes_;
-
+    auto newNode = innerInsert(std::forward(value), placeToInsert);
     return iterator(newNode, root_);
 }
 
@@ -770,6 +725,54 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::findPlaceToInsert(
         }
     }
     return currentNode;
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+template<typename Arg>
+typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerInsert(
+        Arg&& value,
+        typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode*
+            placeToInsert) {
+    if (!placeToInsert) {
+        // That means the tree is empty.
+        assert(!root_);
+        root_ = createNode(std::forward<Arg>(value));
+        leftMostNode_ = root_;
+        rightMostNode_ = root_;
+
+        ++numberOfNodes_;
+
+        return root_;
+    }
+
+    const auto& key = KeyOfValue(value);
+    SplayTreeNode* newNode = createNode(std::forward<Arg>(value));
+    newNode->parent = placeToInsert;
+    if (KeyOfValue(placeToInsert->value) < key) {
+        placeToInsert->rightSon = newNode;
+        if (placeToInsert == rightMostNode_) {
+            rightMostNode_ = newNode;
+        }
+    } else {
+        placeToInsert->leftSon = newNode;
+        if (placeToInsert == leftMostNode_) {
+            leftMostNode_ = newNode;
+        }
+    }
+
+    newNode = splay(newNode);
+    assert(root_ == newNode);
+
+    ++numberOfNodes_;
+
+    return newNode;
 }
 
 template<
