@@ -312,7 +312,10 @@ private:
     SplayTreeNode* innerFind(const key_type& key) const;
 
     template<typename Arg>
-    SplayTreeNode* innerInsert(Arg&& value, SplayTreeNode* placeToInsert);
+    SplayTreeNode* innerInsert(
+        Arg&& value,
+        SplayTreeNode* placeToInsert,
+        SplayTreeNode* newNode = nullptr);
 
     SplayTreeNode* root_{nullptr};
     SplayTreeNode* leftMostNode_{nullptr};
@@ -429,6 +432,65 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::insertEqual(Arg&& value) 
 
     auto newNode = innerInsert(std::forward(value), placeToInsert);
     return iterator(newNode, root_);
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+template<typename... Args>
+std::pair<
+    typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::iterator,
+    bool
+> SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::emplaceUnique(Args&&... args) {
+    SplayTreeNode* newNode = createNode(std::forward<Args>(args)...);
+    try {
+        const auto& key = KeyOfValue(newNode->value);
+        SplayTreeNode* placeToInsert = findPlaceToInsert(key);
+
+        if (placeToInsert && KeyOfValue(placeToInsert->value) == key) {
+            destroyNode(newNode);
+            return {iterator(placeToInsert, root_), false};
+        } else {
+            newNode = innerInsert(
+                newNode->value,
+                placeToInsert,
+                newNode);
+            return {iterator(newNode, root_), true};
+        }
+    } catch (...) {
+        destroyNode(newNode);
+        throw;
+    }
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+template<typename... Args>
+typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::iterator
+SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::emplaceEqual(Args&&... args) {
+    SplayTreeNode* newNode = createNode(std::forward<Args>(args)...);
+    try {
+        const auto& key = KeyOfValue(newNode->value);
+        SplayTreeNode* placeToInsert = findPlaceToInsert(key);
+
+        auto newNode = innerInsert(
+            newNode->value,
+            placeToInsert,
+            newNode);
+        return iterator(newNode, root_);
+    } catch (...) {
+        destroyNode(newNode);
+        throw;
+    }
 }
 
 template<
@@ -739,36 +801,35 @@ typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode*
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerInsert(
         Arg&& value,
         typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode*
-            placeToInsert) {
+            placeToInsert,
+        typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode*
+            newNode) {
+    if (!newNode) {
+        newNode = createNode(std::forward<Arg>(value));
+    }
+
     if (!placeToInsert) {
         // That means the tree is empty.
-        assert(!root_);
-        root_ = createNode(std::forward<Arg>(value));
+        root_ = newNode;
         leftMostNode_ = root_;
         rightMostNode_ = root_;
-
-        ++numberOfNodes_;
-
-        return root_;
-    }
-
-    const auto& key = KeyOfValue(value);
-    SplayTreeNode* newNode = createNode(std::forward<Arg>(value));
-    newNode->parent = placeToInsert;
-    if (KeyOfValue(placeToInsert->value) < key) {
-        placeToInsert->rightSon = newNode;
-        if (placeToInsert == rightMostNode_) {
-            rightMostNode_ = newNode;
-        }
     } else {
-        placeToInsert->leftSon = newNode;
-        if (placeToInsert == leftMostNode_) {
-            leftMostNode_ = newNode;
+        const auto& key = KeyOfValue(newNode->value);
+        newNode->parent = placeToInsert;
+        if (KeyOfValue(placeToInsert->value) < key) {
+            placeToInsert->rightSon = newNode;
+            if (placeToInsert == rightMostNode_) {
+                rightMostNode_ = newNode;
+            }
+        } else {
+            placeToInsert->leftSon = newNode;
+            if (placeToInsert == leftMostNode_) {
+                leftMostNode_ = newNode;
+            }
         }
-    }
 
-    newNode = splay(newNode);
-    assert(root_ == newNode);
+        newNode = splay(newNode);
+    }
 
     ++numberOfNodes_;
 
