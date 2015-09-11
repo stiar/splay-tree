@@ -38,3 +38,12 @@ TEST(splay_tree_test, emplaceUnique) {
     EXPECT_EQ(1, set.count(a));
     EXPECT_EQ(1, set.count(b));
 }
+
+TEST(splay_tree_test, customComparator) {
+    SplayTree<int, int, int, std::greater<int>> set;
+    set.insertUnique(1);
+    set.insertUnique(2);
+
+    EXPECT_EQ(2, *set.begin());
+    EXPECT_EQ(1, *set.rbegin());
+}

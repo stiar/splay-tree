@@ -114,13 +114,11 @@ private:
         }
 
         SplayTreeIterator(const SplayTreeIterator<false>& rhs) :
-                node_(rhs.node_) {
-           // TODO: maybe also check roots? 
+            node_(rhs.node_) {
         }
 
         bool operator==(const SplayTreeIterator& rhs) const {
             return node_ == rhs.node_;
-           // TODO: maybe also check roots? 
         }
 
         bool operator!=(const SplayTreeIterator& rhs) const {
@@ -144,11 +142,11 @@ private:
         }
 
         reference operator*() const {
-            return node_->key;
+            return node_->value;
         }
 
         pointer operator->() const {
-            return &node_->key;
+            return &node_->value;
         }
 
         friend class SplayTreeIterator<true>;
@@ -230,7 +228,7 @@ public:
         return nodeAllocator_.max_size();
     }
 
-    void swap(SplayTree& rhs) {
+    void swap(SplayTree& rhs) noexcept {
         swap(root_, rhs.root_);
         swap(leftMostNode_, rhs.leftMostNode_);
         swap(rightMostNode_, rhs.rightMostNode_);
@@ -321,6 +319,7 @@ private:
     SplayTreeNode* leftMostNode_{nullptr};
     SplayTreeNode* rightMostNode_{nullptr};
     size_type numberOfNodes_{0};
+    Compare comparator_;
     NodeAllocator nodeAllocator_;
 };
 
@@ -520,6 +519,7 @@ std::pair<
 >
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::equal_range(
         const Key& key) {
+    // TODO Implement more efficiently.
     return {lower_bound(key), upper_bound(key)};
 }
 
@@ -723,7 +723,7 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerLowerBound(
     SplayTreeNode* currentNode = root_;
     SplayTreeNode* lowerBound = nullptr;
     while (currentNode) {
-        if (KeyOfValue(currentNode->value) >= key) {
+        if (!comparator_(KeyOfValue(currentNode->value), key)) {
             lowerBound = currentNode;
             currentNode = currentNode->leftSon;
         } else {
@@ -746,7 +746,7 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerUpperBound(
     SplayTreeNode* currentNode = root_;
     SplayTreeNode* upperBound = nullptr;
     while (currentNode) {
-        if (KeyOfValue(currentNode->value) > key) {
+        if (comparator_(key, KeyOfValue(currentNode->value))) {
             upperBound = currentNode;
             currentNode = currentNode->leftSon;
         } else {
@@ -772,7 +772,7 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::findPlaceToInsert(
         if (currentNodeKey == key) {
             return currentNode;
         }
-        if (currentNodeKey > key) {
+        if (comparator_(key, currentNodeKey)) {
             if (!currentNode->leftSon) {
                 return currentNode;
             } else {
@@ -816,7 +816,7 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerInsert(
     } else {
         const auto& key = KeyOfValue(newNode->value);
         newNode->parent = placeToInsert;
-        if (KeyOfValue(placeToInsert->value) < key) {
+        if (comparator_(KeyOfValue(placeToInsert->value), key)) {
             placeToInsert->rightSon = newNode;
             if (placeToInsert == rightMostNode_) {
                 rightMostNode_ = newNode;
