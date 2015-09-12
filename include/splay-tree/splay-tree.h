@@ -89,6 +89,41 @@ private:
         }
     }
 
+    SplayTreeNode* copyTree(SplayTreeNode* root) {
+        SplayTreeNode* rootCopy;
+        try {
+            rootCopy = createNode(root->value);
+            if (root->leftSon) {
+                rootCopy->leftSon = copyTree(root->leftSon);
+                rootCopy->leftSon->parent = rootCopy;
+            }
+            if (root->rightSon) {
+                rootCopy->rightSon = copyTree(root->rightSon);
+                rootCopy->rightSon->parent = rootCopy;
+            }
+            return rootCopy;
+        } catch (...) {
+            destroyTree(rootCopy);
+            throw;
+        }
+    }
+
+    static SplayTreeNode* getLeftMostNode(SplayTreeNode* root) {
+        auto currentNode = root;
+        while (currentNode->leftSon) {
+            currentNode = currentNode->leftSon;
+        }
+        return currentNode;
+    }
+
+    static SplayTreeNode* getRightMostNode(SplayTreeNode* root) {
+        auto currentNode = root;
+        while (currentNode->rightSon) {
+            currentNode = currentNode->rightSon;
+        }
+        return currentNode;
+    }
+
     template<bool IsConstIterator>
     class SplayTreeIterator {
     public:
@@ -163,26 +198,48 @@ public:
     typedef std::reverse_iterator<iterator> reverse_iterator;
     typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
 
-    SplayTree() :
-        root_(nullptr),
-        numberOfNodes_(0) {
+    // Construction/destruction.
+    SplayTree() {
     }
 
-    // TODO
-    SplayTree(const SplayTree& rhs);
+    SplayTree(Compare comparator, const Allocator& allocator = Allocator()) :
+        comparator_(std::move(comparator)),
+        nodeAllocator_(allocator) {
+    }
 
-    // TODO
-    SplayTree(SplayTree&& rhs);
+    SplayTree(
+            std::initializer_list<Value> initializerList,
+            Compare = Compare(),
+            const Allocator& allocator = Allocator()) {
+        insertUnique(initializerList.begin(), initializerList.end());
+    }
 
-    ~SplayTree() {
+    SplayTree(const SplayTree& rhs) :
+        root_(copyTree(rhs.root_)),
+        leftMostNode_(getLeftMostNode(root_)),
+        rightMostNode_(getRightMostNode(root_)),
+        numberOfNodes_(rhs.numberOfNodes_),
+        comparator_(rhs.comparator_),
+        nodeAllocator_(rhs.nodeAllocator_) {
+    }
+
+    SplayTree(SplayTree&& rhs) = default;
+
+    ~SplayTree() noexcept {
         destroyTree(root_);
     }
 
-    // TODO
-    SplayTree& operator=(const SplayTree& rhs);
+    SplayTree& operator=(const SplayTree& rhs) {
+        SplayTree temp(rhs);
+        swap(*this, temp);
+        return *this;
+    }
 
-    // TODO
-    SplayTree& operator=(SplayTree&& rhs) noexcept;
+    SplayTree& operator=(SplayTree&& rhs) noexcept {
+        clear();
+        swap(*this, rhs);
+        return *this;
+    }
 
     iterator begin() noexcept {
         return iterator(leftMostNode_, root_);
@@ -224,7 +281,7 @@ public:
         return numberOfNodes_;
     }
 
-    size_type maxsize() const noexcept {
+    size_type max_size() const noexcept {
         return nodeAllocator_.max_size();
     }
 
@@ -233,6 +290,9 @@ public:
         swap(leftMostNode_, rhs.leftMostNode_);
         swap(rightMostNode_, rhs.rightMostNode_);
         swap(numberOfNodes_, rhs.numberOfNodes_);
+        swap(comparator_, rhs.comparator_);
+        // TODO Check if everything is ok with swapping allocators.
+        swap(nodeAllocator_, rhs.nodeAllocator_);
     }
 
     void clear() noexcept {
@@ -247,8 +307,22 @@ public:
     template<typename Arg>
     std::pair<iterator, bool> insertUnique(Arg&& value);
 
+    template<typename InputIterator>
+    void insertUnique(InputIterator first, InputIterator last) {
+        for (; first != last; ++first) {
+            insertUnique(*first);
+        }
+    }
+
     template<typename Arg>
     iterator insertEqual(Arg&& value);
+
+    template<typename InputIterator>
+    void insertEqual(InputIterator first, InputIterator last) {
+        for (; first != last; ++first) {
+            insertEqual(*first);
+        }
+    }
 
     template<typename... Args>
     std::pair<iterator, bool> emplaceUnique(Args&&... args);
@@ -323,7 +397,7 @@ private:
     NodeAllocator nodeAllocator_;
 };
 
-// TODO Write compare operators.
+// TODO Write compare operators + swap function.
 
 template<
     typename Key,
@@ -569,18 +643,11 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::splay(
         }
     }
 
-    assert(!node->parent);
     // FIXME Write this more clever.
-    leftMostNode_ = root_;
-    while (leftMostNode_->leftSon) {
-        leftMostNode_ = leftMostNode_->leftSon;
-    }
-    rightMostNode_ = root_;
-    while (rightMostNode_->rightSon) {
-        rightMostNode_ = rightMostNode_->rightSon;
-    }
+    leftMostNode_ = getLeftMostNode(root_);
+    rightMostNode_ = getRightMostNode(root_);
 
-    return node;
+    return root_;
 }
 
 template<

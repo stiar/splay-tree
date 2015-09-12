@@ -47,3 +47,17 @@ TEST(splay_tree_test, customComparator) {
     EXPECT_EQ(2, *set.begin());
     EXPECT_EQ(1, *set.rbegin());
 }
+
+TEST(splay_tree_test, construction) {
+    SplayTree<int, int, int, std::less<int>> set1{3, 1, 4};
+    EXPECT_EQ(1, set1.count(1));
+    EXPECT_EQ(0, set1.count(2));
+    EXPECT_EQ(1, set1.count(3));
+    EXPECT_EQ(1, set1.count(4));
+
+    SplayTree<int, int, int, std::less<int>> set2(set1);
+    EXPECT_EQ(1, set2.count(1));
+    EXPECT_EQ(0, set2.count(2));
+    EXPECT_EQ(1, set2.count(3));
+    EXPECT_EQ(1, set2.count(4));
+}
