@@ -49,7 +49,10 @@ TEST(splay_tree_test, customComparator) {
 }
 
 TEST(splay_tree_test, construction) {
-    SplayTree<int, int, int, std::less<int>> set1{3, 1, 4};
+    SplayTree<int, int, int, std::less<int>> set1;
+    set1.insertUnique(3);
+    set1.insertUnique(4);
+    set1.insertUnique(1);
     EXPECT_EQ(1, set1.count(1));
     EXPECT_EQ(0, set1.count(2));
     EXPECT_EQ(1, set1.count(3));

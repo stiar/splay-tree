@@ -13,7 +13,6 @@ template <
     typename Key,
     typename Value,
     typename KeyOfValue,
-    // TODO Custom comparators are ignored so far.
     typename Compare,
     typename Allocator = std::allocator<Value>
 >
@@ -31,7 +30,7 @@ public:
 
 private:
     // TODO Split this struct into a non-template base class and a derived class
-    //      consisting of value (and maybe something else?).
+    //      consisting of a value (and maybe something else?).
     struct SplayTreeNode {
         template<typename... Args>
         SplayTreeNode(Args&&... args) :
@@ -77,6 +76,7 @@ private:
         deallocateNode(node);
     }
 
+    // TODO Can this function provide a noexcept guarantee?
     void destroyTree(SplayTreeNode* root) {
         if (root) {
             if (root->leftSon) {
@@ -108,16 +108,16 @@ private:
         }
     }
 
-    static SplayTreeNode* getLeftMostNode(SplayTreeNode* root) {
-        auto currentNode = root;
+    SplayTreeNode* getLeftMostNode() {
+        auto currentNode = root_;
         while (currentNode->leftSon) {
             currentNode = currentNode->leftSon;
         }
         return currentNode;
     }
 
-    static SplayTreeNode* getRightMostNode(SplayTreeNode* root) {
-        auto currentNode = root;
+    SplayTreeNode* getRightMostNode() {
+        auto currentNode = root_;
         while (currentNode->rightSon) {
             currentNode = currentNode->rightSon;
         }
@@ -149,7 +149,8 @@ private:
         }
 
         SplayTreeIterator(const SplayTreeIterator<false>& rhs) :
-            node_(rhs.node_) {
+            node_(rhs.node_),
+            root_(rhs.root_) {
         }
 
         bool operator==(const SplayTreeIterator& rhs) const {
@@ -185,6 +186,7 @@ private:
         }
 
         friend class SplayTreeIterator<true>;
+        friend class SplayTree;
 
     private:
         SplayTreeNode* node_;
@@ -202,28 +204,26 @@ public:
     SplayTree() {
     }
 
-    SplayTree(Compare comparator, const Allocator& allocator = Allocator()) :
+    explicit SplayTree(Compare comparator, const Allocator& allocator = Allocator()) :
         comparator_(std::move(comparator)),
         nodeAllocator_(allocator) {
     }
 
-    SplayTree(
-            std::initializer_list<Value> initializerList,
-            Compare = Compare(),
-            const Allocator& allocator = Allocator()) {
-        insertUnique(initializerList.begin(), initializerList.end());
-    }
-
     SplayTree(const SplayTree& rhs) :
         root_(copyTree(rhs.root_)),
-        leftMostNode_(getLeftMostNode(root_)),
-        rightMostNode_(getRightMostNode(root_)),
+        leftMostNode_(getLeftMostNode()),
+        rightMostNode_(getRightMostNode()),
         numberOfNodes_(rhs.numberOfNodes_),
         comparator_(rhs.comparator_),
         nodeAllocator_(rhs.nodeAllocator_) {
     }
 
-    SplayTree(SplayTree&& rhs) = default;
+    // TODO Make noexcept.
+    // TODO What if default constuctors of Compare and Allocator take time?
+    SplayTree(SplayTree&& rhs) :
+            SplayTree() {
+        swap(rhs);
+    }
 
     ~SplayTree() noexcept {
         destroyTree(root_);
@@ -231,13 +231,14 @@ public:
 
     SplayTree& operator=(const SplayTree& rhs) {
         SplayTree temp(rhs);
-        swap(*this, temp);
+        swap(temp);
         return *this;
     }
 
-    SplayTree& operator=(SplayTree&& rhs) noexcept {
+    // TODO Make noexcept.
+    SplayTree& operator=(SplayTree&& rhs) {
         clear();
-        swap(*this, rhs);
+        swap(rhs);
         return *this;
     }
 
@@ -285,7 +286,9 @@ public:
         return nodeAllocator_.max_size();
     }
 
-    void swap(SplayTree& rhs) noexcept {
+    // TODO Make noexcept.
+    void swap(SplayTree& rhs) {
+        using std::swap;
         swap(root_, rhs.root_);
         swap(leftMostNode_, rhs.leftMostNode_);
         swap(rightMostNode_, rhs.rightMostNode_);
@@ -330,9 +333,35 @@ public:
     template<typename... Args>
     iterator emplaceEqual(Args&&... args);
 
+    iterator erase(const_iterator position) {
+        SplayTreeNode* node = position.node_;
+        iterator result(node, root_);
+        ++result;
+        innerErase(node);
+        return result;
+    }
+
+    iterator erase(const_iterator first, const_iterator last) {
+        while (first != last) {
+            first = erase(first);
+        }
+        return first;
+    }
+
+    size_type erase(const Key& key) {
+        auto range = equal_range(key);
+        const size_type oldSize = size();
+        erase(range.first, range.second);
+        return oldSize - size();
+    }
+
     // Find operations.
     iterator find(const key_type& key) {
-        return iterator(innerFind(key), root_);
+        auto node = innerFind(key);
+        if (node) {
+            node = splay(node);
+        }
+        return iterator(node, root_);
     }
 
     const_iterator find(const key_type& key) const {
@@ -363,6 +392,8 @@ public:
     equal_range(const key_type& key) const;
 
 private:
+    // Splay and rotations.
+    // TODO Move them to SplayTreeImpl.
     SplayTreeNode* splay(SplayTreeNode* node);
 
     SplayTreeNode* zigStep(SplayTreeNode* node);
@@ -375,13 +406,12 @@ private:
 
     SplayTreeNode* rightRotation(SplayTreeNode* node);
 
+    // Helpers.
     SplayTreeNode* innerLowerBound(const key_type& key) const;
 
     SplayTreeNode* innerUpperBound(const key_type& key) const;
 
     SplayTreeNode* findPlaceToInsert(const key_type& key) const;
-
-    SplayTreeNode* innerFind(const key_type& key) const;
 
     template<typename Arg>
     SplayTreeNode* innerInsert(
@@ -389,6 +419,11 @@ private:
         SplayTreeNode* placeToInsert,
         SplayTreeNode* newNode = nullptr);
 
+    void innerErase(SplayTreeNode* node);
+
+    SplayTreeNode* innerFind(const key_type& key) const;
+
+    // TODO Move the following 4 fields to SplayTreeImpl.
     SplayTreeNode* root_{nullptr};
     SplayTreeNode* leftMostNode_{nullptr};
     SplayTreeNode* rightMostNode_{nullptr};
@@ -643,9 +678,9 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::splay(
         }
     }
 
-    // FIXME Write this more clever.
-    leftMostNode_ = getLeftMostNode(root_);
-    rightMostNode_ = getRightMostNode(root_);
+    // TODO Or maybe maintain those nodes during rotations?
+    leftMostNode_ = getLeftMostNode();
+    rightMostNode_ = getRightMostNode();
 
     return root_;
 }
@@ -901,6 +936,18 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerInsert(
     ++numberOfNodes_;
 
     return newNode;
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+void SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerErase(
+        typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode* node) {
+    // TODO
 }
 
 template<
