@@ -44,13 +44,15 @@ TEST(splay_tree_test, erase) {
     set.insertUnique(1);
     set.insertUnique(3);
     set.insertUnique(5);
+    set.insertUnique(4);
 
     set.erase(3);
     EXPECT_EQ(1, *set.begin());
     EXPECT_EQ(5, *set.rbegin());
     set.erase(1);
-    EXPECT_EQ(1, set.size());
-    EXPECT_EQ(5, *set.begin());
+    EXPECT_EQ(2, set.size());
+    EXPECT_EQ(4, *set.begin());
+    EXPECT_EQ(5, *set.rbegin());
 }
 
 TEST(splay_tree_test, customComparator) {

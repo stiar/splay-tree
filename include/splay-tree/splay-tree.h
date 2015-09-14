@@ -109,6 +109,9 @@ private:
     }
 
     SplayTreeNode* getLeftMostNode() {
+        if (!root_) {
+            return nullptr;
+        }
         auto currentNode = root_;
         while (currentNode->leftChild) {
             currentNode = currentNode->leftChild;
@@ -117,6 +120,9 @@ private:
     }
 
     SplayTreeNode* getRightMostNode() {
+        if (!root_) {
+            return nullptr;
+        }
         auto currentNode = root_;
         while (currentNode->rightChild) {
             currentNode = currentNode->rightChild;
@@ -969,10 +975,38 @@ void SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerErase(
             nodeToExchange = nodeToExchange->leftChild;
         }
 
-        // FIXME Not safe.
-        using std::swap;
-        swap(node->value, nodeToExchange->value);
-        node = nodeToExchange;
+        nodeToExchange->leftChild = node->leftChild;
+        node->leftChild->parent = nodeToExchange;
+        node->leftChild = nullptr;
+
+        auto nodeParent = node->parent;
+        if (nodeToExchange->parent->leftChild == nodeToExchange) {
+            nodeToExchange->parent->leftChild = node;
+            node->parent = nodeToExchange->parent;
+            std::swap(nodeToExchange->rightChild, node->rightChild);
+            if (node->rightChild) {
+                node->rightChild->parent = node;
+            }
+            nodeToExchange->rightChild->parent = nodeToExchange;
+        } else {
+            node->rightChild = nodeToExchange->rightChild;
+            if (node->rightChild) {
+                node->rightChild->parent = node;
+            }
+            nodeToExchange->rightChild = node;
+            node->parent = nodeToExchange;
+        }
+
+        if (nodeParent) {
+            if (nodeParent->leftChild == node) {
+                nodeParent->leftChild = nodeToExchange;
+            } else {
+                nodeParent->rightChild = nodeToExchange;
+            }
+        } else {
+            root_ = nodeToExchange;
+        }
+        nodeToExchange->parent = nodeParent;
     }
 
     if (!node->parent) {
@@ -981,7 +1015,9 @@ void SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerErase(
         } else {
             root_ = node->rightChild;
         }
-        root_->parent = nullptr;
+        if (root_) {
+            root_->parent = nullptr;
+        }
     } else {
         auto parent = node->parent;
         auto child = node->leftChild ? node->leftChild : node->rightChild;
@@ -995,6 +1031,10 @@ void SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerErase(
         }
         splay(parent);
     }
+
+    // TODO Update leftMostNode and rightMostNode during erase.
+    leftMostNode_ = getLeftMostNode();
+    rightMostNode_ = getRightMostNode();
 
     destroyNode(node);
     --numberOfNodes_;
