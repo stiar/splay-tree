@@ -39,6 +39,20 @@ TEST(splay_tree_test, emplaceUnique) {
     EXPECT_EQ(1, set.count(b));
 }
 
+TEST(splay_tree_test, erase) {
+    SplayTree<int, int, int, std::less<int>> set;
+    set.insertUnique(1);
+    set.insertUnique(3);
+    set.insertUnique(5);
+
+    set.erase(3);
+    EXPECT_EQ(1, *set.begin());
+    EXPECT_EQ(5, *set.rbegin());
+    set.erase(1);
+    EXPECT_EQ(1, set.size());
+    EXPECT_EQ(5, *set.begin());
+}
+
 TEST(splay_tree_test, customComparator) {
     SplayTree<int, int, int, std::greater<int>> set;
     set.insertUnique(1);

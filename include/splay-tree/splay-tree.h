@@ -30,7 +30,7 @@ public:
 
 private:
     // TODO Split this struct into a non-template base class and a derived class
-    //      consisting of a value (and maybe something else?).
+    //      with a field containing the value.
     struct SplayTreeNode {
         template<typename... Args>
         SplayTreeNode(Args&&... args) :
@@ -39,8 +39,8 @@ private:
 
         value_type value;
         SplayTreeNode* parent{nullptr};
-        SplayTreeNode* leftSon{nullptr};
-        SplayTreeNode* rightSon{nullptr};
+        SplayTreeNode* leftChild{nullptr};
+        SplayTreeNode* rightChild{nullptr};
     };
 
     typedef
@@ -79,11 +79,11 @@ private:
     // TODO Can this function provide a noexcept guarantee?
     void destroyTree(SplayTreeNode* root) {
         if (root) {
-            if (root->leftSon) {
-                destroyTree(root->leftSon);
+            if (root->leftChild) {
+                destroyTree(root->leftChild);
             }
-            if (root->rightSon) {
-                destroyTree(root->rightSon);
+            if (root->rightChild) {
+                destroyTree(root->rightChild);
             }
             destroyNode(root);
         }
@@ -93,13 +93,13 @@ private:
         SplayTreeNode* rootCopy;
         try {
             rootCopy = createNode(root->value);
-            if (root->leftSon) {
-                rootCopy->leftSon = copyTree(root->leftSon);
-                rootCopy->leftSon->parent = rootCopy;
+            if (root->leftChild) {
+                rootCopy->leftChild = copyTree(root->leftChild);
+                rootCopy->leftChild->parent = rootCopy;
             }
-            if (root->rightSon) {
-                rootCopy->rightSon = copyTree(root->rightSon);
-                rootCopy->rightSon->parent = rootCopy;
+            if (root->rightChild) {
+                rootCopy->rightChild = copyTree(root->rightChild);
+                rootCopy->rightChild->parent = rootCopy;
             }
             return rootCopy;
         } catch (...) {
@@ -110,16 +110,16 @@ private:
 
     SplayTreeNode* getLeftMostNode() {
         auto currentNode = root_;
-        while (currentNode->leftSon) {
-            currentNode = currentNode->leftSon;
+        while (currentNode->leftChild) {
+            currentNode = currentNode->leftChild;
         }
         return currentNode;
     }
 
     SplayTreeNode* getRightMostNode() {
         auto currentNode = root_;
-        while (currentNode->rightSon) {
-            currentNode = currentNode->rightSon;
+        while (currentNode->rightChild) {
+            currentNode = currentNode->rightChild;
         }
         return currentNode;
     }
@@ -341,7 +341,22 @@ public:
         return result;
     }
 
+    iterator erase(iterator position) {
+        auto result = position;
+        ++result;
+        innerErase(position.node_);
+        return result;
+    }
+
+    // TODO Remove code dupcliation.
     iterator erase(const_iterator first, const_iterator last) {
+        while (first != last) {
+            first = erase(first);
+        }
+        return first;
+    }
+
+    iterator erase(iterator first, iterator last) {
         while (first != last) {
             first = erase(first);
         }
@@ -393,7 +408,9 @@ public:
 
 private:
     // Splay and rotations.
-    // TODO Move them to SplayTreeImpl.
+    // TODO When SplayTreeNode struct will be appropriately split, following
+    //      methods will no longer depend on keys, values and template
+    //      parameters and should be moved from here.
     SplayTreeNode* splay(SplayTreeNode* node);
 
     SplayTreeNode* zigStep(SplayTreeNode* node);
@@ -423,7 +440,6 @@ private:
 
     SplayTreeNode* innerFind(const key_type& key) const;
 
-    // TODO Move the following 4 fields to SplayTreeImpl.
     SplayTreeNode* root_{nullptr};
     SplayTreeNode* leftMostNode_{nullptr};
     SplayTreeNode* rightMostNode_{nullptr};
@@ -447,10 +463,10 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeIterator<IsConst
     if (node_) {
         SplayTreeNode* currentNode = node_;
 
-        if (currentNode->rightSon) {
-            currentNode = currentNode->rightSon;
-            while (currentNode->leftSon) {
-                currentNode = currentNode->leftSon;
+        if (currentNode->rightChild) {
+            currentNode = currentNode->rightChild;
+            while (currentNode->leftChild) {
+                currentNode = currentNode->leftChild;
             }
             node_ = currentNode;
         } else {
@@ -458,7 +474,7 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeIterator<IsConst
             //      bit slower than the corresponding one in STL. Should think
             //      about how to fix it (can a fake root help?)
             while (currentNode->parent &&
-                    currentNode->parent->rightSon == currentNode) {
+                    currentNode->parent->rightChild == currentNode) {
                 currentNode = currentNode->parent;
             }
             node_ = currentNode->parent;
@@ -480,22 +496,22 @@ typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::template SplayTr
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeIterator<IsConstIterator>::operator--() {
     if (!node_) {
         SplayTreeNode* currentNode = root_;
-        while (currentNode && currentNode->rightSon) {
-            currentNode = currentNode->rightSon;
+        while (currentNode && currentNode->rightChild) {
+            currentNode = currentNode->rightChild;
         }
         node_ = currentNode;
     } else {
         SplayTreeNode* currentNode = node_;
 
-        if (currentNode->leftSon) {
-            currentNode = currentNode->leftSon;
-            while (currentNode->rightSon) {
-                currentNode = currentNode->rightSon;
+        if (currentNode->leftChild) {
+            currentNode = currentNode->leftChild;
+            while (currentNode->rightChild) {
+                currentNode = currentNode->rightChild;
             }
             node_ = currentNode;
         } else {
             while (currentNode->parent &&
-                    currentNode->parent->leftSon == currentNode) {
+                    currentNode->parent->leftChild == currentNode) {
                 currentNode = currentNode->parent;
             }
             node_ = currentNode->parent;
@@ -667,7 +683,7 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::splay(
             SplayTreeNode* parent = node->parent;
             SplayTreeNode* grandParent = parent->parent;
 
-            if ((grandParent->leftSon == parent) == (parent->leftSon == node)) {
+            if ((grandParent->leftChild == parent) == (parent->leftChild == node)) {
                 node = zigZigStep(node);
             } else {
                 node = zigZagStep(node);
@@ -695,7 +711,7 @@ template<
 typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode*
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::zigStep(
         typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode* node) {
-    if (node->parent->leftSon == node) {
+    if (node->parent->leftChild == node) {
         return rightRotation(node);
     } else {
         return leftRotation(node);
@@ -713,13 +729,13 @@ typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode*
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::zigZigStep(
         typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode* node) {
     SplayTreeNode* parent = node->parent;
-    if (parent->leftSon == node) {
+    if (parent->leftChild == node) {
         parent = rightRotation(parent);
-        node = parent->leftSon;
+        node = parent->leftChild;
         return rightRotation(node);
     } else {
         parent = leftRotation(parent);
-        node = parent->rightSon;
+        node = parent->rightChild;
         return leftRotation(node);
     }
 }
@@ -735,7 +751,7 @@ typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode*
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::zigZagStep(
         typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode* node) {
     SplayTreeNode* parent = node->parent;
-    if (parent->leftSon == node) {
+    if (parent->leftChild == node) {
         node = rightRotation(node);
         return leftRotation(node);
     } else {
@@ -756,21 +772,21 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::leftRotation(
         typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode* node) {
     SplayTreeNode* parent = node->parent;
     assert(parent);
-    assert(parent->rightSon == node);
+    assert(parent->rightChild == node);
     SplayTreeNode* grandParent = parent->parent;
 
-    parent->rightSon = node->leftSon;
-    if (node->leftSon) {
-        node->leftSon->parent = parent;
+    parent->rightChild = node->leftChild;
+    if (node->leftChild) {
+        node->leftChild->parent = parent;
     }
 
-    node->leftSon = parent;
+    node->leftChild = parent;
     node->parent = grandParent;
     if (grandParent) {
-        if (grandParent->leftSon == parent) {
-            grandParent->leftSon = node;
+        if (grandParent->leftChild == parent) {
+            grandParent->leftChild = node;
         } else {
-            grandParent->rightSon = node;
+            grandParent->rightChild = node;
         }
     }
     parent->parent = node;
@@ -790,21 +806,21 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::rightRotation(
         typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode* node) {
     SplayTreeNode* parent = node->parent;
     assert(parent);
-    assert(parent->leftSon == node);
+    assert(parent->leftChild == node);
     SplayTreeNode* grandParent = parent->parent;
 
-    parent->leftSon = node->rightSon;
-    if (node->rightSon) {
-        node->rightSon->parent = parent;
+    parent->leftChild = node->rightChild;
+    if (node->rightChild) {
+        node->rightChild->parent = parent;
     }
 
-    node->rightSon = parent;
+    node->rightChild = parent;
     node->parent = grandParent;
     if (grandParent) {
-        if (grandParent->leftSon == parent) {
-            grandParent->leftSon = node;
+        if (grandParent->leftChild == parent) {
+            grandParent->leftChild = node;
         } else {
-            grandParent->rightSon = node;
+            grandParent->rightChild = node;
         }
     }
     parent->parent = node;
@@ -827,9 +843,9 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerLowerBound(
     while (currentNode) {
         if (!comparator_(KeyOfValue(currentNode->value), key)) {
             lowerBound = currentNode;
-            currentNode = currentNode->leftSon;
+            currentNode = currentNode->leftChild;
         } else {
-            currentNode = currentNode->rightSon;
+            currentNode = currentNode->rightChild;
         }
     }
     return lowerBound;
@@ -850,9 +866,9 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerUpperBound(
     while (currentNode) {
         if (comparator_(key, KeyOfValue(currentNode->value))) {
             upperBound = currentNode;
-            currentNode = currentNode->leftSon;
+            currentNode = currentNode->leftChild;
         } else {
-            currentNode = currentNode->rightSon;
+            currentNode = currentNode->rightChild;
         }
     }
     return upperBound;
@@ -875,16 +891,16 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::findPlaceToInsert(
             return currentNode;
         }
         if (comparator_(key, currentNodeKey)) {
-            if (!currentNode->leftSon) {
+            if (!currentNode->leftChild) {
                 return currentNode;
             } else {
-                currentNode = currentNode->leftSon;
+                currentNode = currentNode->leftChild;
             }
         } else {
-            if (!currentNode->rightSon) {
+            if (!currentNode->rightChild) {
                 return currentNode;
             } else {
-                currentNode = currentNode->rightSon;
+                currentNode = currentNode->rightChild;
             }
         }
     }
@@ -919,12 +935,12 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerInsert(
         const auto& key = KeyOfValue(newNode->value);
         newNode->parent = placeToInsert;
         if (comparator_(KeyOfValue(placeToInsert->value), key)) {
-            placeToInsert->rightSon = newNode;
+            placeToInsert->rightChild = newNode;
             if (placeToInsert == rightMostNode_) {
                 rightMostNode_ = newNode;
             }
         } else {
-            placeToInsert->leftSon = newNode;
+            placeToInsert->leftChild = newNode;
             if (placeToInsert == leftMostNode_) {
                 leftMostNode_ = newNode;
             }
@@ -947,7 +963,41 @@ template<
 >
 void SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerErase(
         typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode* node) {
-    // TODO
+    if (node->leftChild && node->rightChild) {
+        SplayTreeNode* nodeToExchange = node->rightChild;
+        while (nodeToExchange->leftChild) {
+            nodeToExchange = nodeToExchange->leftChild;
+        }
+
+        // FIXME Not safe.
+        using std::swap;
+        swap(node->value, nodeToExchange->value);
+        node = nodeToExchange;
+    }
+
+    if (!node->parent) {
+        if (node->leftChild) {
+            root_ = node->leftChild;
+        } else {
+            root_ = node->rightChild;
+        }
+        root_->parent = nullptr;
+    } else {
+        auto parent = node->parent;
+        auto child = node->leftChild ? node->leftChild : node->rightChild;
+        if (parent->leftChild == node) {
+            parent->leftChild = child;
+        } else {
+            parent->rightChild = child;
+        }
+        if (child) {
+            child->parent = parent;
+        }
+        splay(parent);
+    }
+
+    destroyNode(node);
+    --numberOfNodes_;
 }
 
 template<

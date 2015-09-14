@@ -24,6 +24,7 @@ TEST(splay_tree_test, stressTestWithSet) {
 
     enum Operation {
         INSERT,
+        ERASE,
         COUNT,
         LOWER_BOUND,
         UPPER_BOUND,
@@ -50,6 +51,12 @@ TEST(splay_tree_test, stressTestWithSet) {
                     EXPECT_EQ(
                         stlSetInsertResult.second,
                         splayTreeInsertResult.second);
+                }
+                break;
+            case ERASE:
+                {
+                    int key = randomInt(mt);
+                    EXPECT_EQ(stlSet.erase(key), splayTreeSet.erase(key));
                 }
                 break;
             case COUNT:
