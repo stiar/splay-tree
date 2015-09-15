@@ -47,24 +47,16 @@ private:
         typename Allocator::template rebind<SplayTreeNode>::other
         NodeAllocator;
 
-    SplayTreeNode* allocateNode() {
-        return nodeAllocator_.allocate(1);
-    }
-
-    void deallocateNode(SplayTreeNode* node) {
-        nodeAllocator_.deallocate(node, 1);
-    }
-
     template<typename... Args>
     SplayTreeNode* createNode(Args&&... args) {
-        auto newNode = allocateNode();
+        auto newNode = nodeAllocator_.allocate(1);
         try {
             std::allocator_traits<NodeAllocator>::construct(
                 nodeAllocator_,
                 newNode,
                 std::forward<Args>(args)...);
         } catch (...) {
-            deallocateNode(newNode);
+            nodeAllocator_.deallocate(newNode, 1);
             throw;
         }
 
@@ -73,19 +65,30 @@ private:
 
     void destroyNode(SplayTreeNode* node) {
         nodeAllocator_.destroy(node);
-        deallocateNode(node);
+        nodeAllocator_.deallocate(node, 1);
     }
 
-    // TODO Can this function provide a noexcept guarantee?
-    void destroyTree(SplayTreeNode* root) {
-        if (root) {
-            if (root->leftChild) {
-                destroyTree(root->leftChild);
+    void destroyTree(SplayTreeNode* root) noexcept {
+        auto currentNode = root;
+        while (currentNode) {
+            if (currentNode->leftChild) {
+                currentNode = currentNode->leftChild;
+                continue;
             }
-            if (root->rightChild) {
-                destroyTree(root->rightChild);
+            if (currentNode->rightChild) {
+                currentNode = currentNode->rightChild;
+                continue;
             }
-            destroyNode(root);
+            auto parent = currentNode->parent;
+            if (parent) {
+                if (parent->leftChild == currentNode) {
+                    parent->leftChild = nullptr;
+                } else {
+                    parent->rightChild = nullptr;
+                }
+            }
+            destroyNode(currentNode);
+            currentNode = parent;
         }
     }
 
@@ -389,6 +392,8 @@ public:
         return const_iterator(innerFind(key), root_);
     }
 
+    size_type count(const key_type& key);
+
     size_type count(const key_type& key) const;
 
     iterator lower_bound(const key_type& key) {
@@ -621,6 +626,20 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::emplaceEqual(Args&&... ar
         destroyNode(newNode);
         throw;
     }
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::size_type
+SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::count(
+        const Key& key) {
+    auto range = equal_range(key);
+    return std::distance(range.first, range.second);
 }
 
 template<
