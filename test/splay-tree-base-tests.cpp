@@ -81,6 +81,37 @@ TEST(splay_tree_test, construction) {
     EXPECT_EQ(1, set2.count(4));
 }
 
+TEST(splay_tree_test, split) {
+    SplayTree<int, int, int> set1;
+    set1.insertEqual(1);
+    set1.insertEqual(3);
+    set1.insertEqual(4);
+    set1.insertEqual(4);
+    set1.insertEqual(5);
+
+    auto set2 = set1.split(4);
+
+    std::vector<int> set1Excepted{1, 3};
+    EXPECT_EQ(2, set1.size());
+    {
+        auto itSet = set1.cbegin();
+        auto itVec = set1Excepted.cbegin();
+        for (; itSet != set1.cend(); ++itSet, ++itVec) {
+            EXPECT_EQ(*itVec, *itSet);
+        }
+    }
+
+    std::vector<int> set2Excepted{4, 5};
+    EXPECT_EQ(2, set1.size());
+    {
+        auto itSet = set2.cbegin();
+        auto itVec = set2Excepted.cbegin();
+        for (; itSet != set1.cend(); ++itSet, ++itVec) {
+            EXPECT_EQ(*itVec, *itSet);
+        }
+    }
+}
+
 TEST(splay_tree_test, mergeUnique) {
     SplayTree<int, int, int> set1;
     set1.insertUnique(1);

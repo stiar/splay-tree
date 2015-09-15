@@ -232,6 +232,21 @@ public:
         nodeAllocator_(rhs.nodeAllocator_) {
     }
 
+private:
+    SplayTree(
+        SplayTreeNode* root,
+        Compare comparator,
+        const NodeAllocator& nodeAllocator) :
+            root_(root),
+            leftMostNode_(getLeftMostNode()),
+            rightMostNode_(getRightMostNode()),
+            numberOfNodes_(std::distance(cbegin(), cend())),
+            comparator_(comparator),
+            nodeAllocator_(nodeAllocator) {
+    }
+
+public:
+
     // TODO Make noexcept.
     // TODO What if default constuctors of Compare and Allocator take time?
     SplayTree(SplayTree&& rhs) :
@@ -402,12 +417,26 @@ public:
 
     // Split/merge operations.
     // TODO Implement split.
-    std::pair<SplayTree, SplayTree> split(iterator position);
+    SplayTree split(iterator position) {
+        return innerSplit(position.node_);
+    }
 
-    std::pair<SplayTree, SplayTree> split(const_iterator position);
+    SplayTree split(const_iterator position) {
+        return innerSplit(position.node_);
+    }
 
-    std::pair<SplayTree, SplayTree> split(const Key& key);
+    SplayTree split(const Key& key) {
+        auto node = innerLowerBound(key);
+        if (!node || KeyOfValue(node->value) != key) {
+            throw std::runtime_error(
+                "Requested split with a key that is not present in the tree.");
+        }
+        return innerSplit(node);
+    }
 
+    // Merge assumes that the tree given as a parameter has its minimum key
+    // greater than the maximum key in the current tree (or greater or equal in
+    // case of mergeEqual).
     void mergeUnique(SplayTree&& rhs);
 
     void mergeUnique(const SplayTree& rhs) {
@@ -482,7 +511,9 @@ private:
 
     SplayTreeNode* innerUpperBound(const key_type& key) const;
 
-    SplayTreeNode* findPlaceToInsert(const key_type& key) const;
+    SplayTreeNode* findPlaceToInsertUnique(const key_type& key) const;
+
+    SplayTreeNode* findPlaceToInsertEqual(const key_type& key) const;
 
     template<typename Arg>
     SplayTreeNode* innerInsert(
@@ -492,9 +523,15 @@ private:
 
     void innerErase(SplayTreeNode* node);
 
+    SplayTree innerSplit(SplayTreeNode* node);
+
     void innerMerge(SplayTree&& rhs);
 
     SplayTreeNode* innerFind(const key_type& key) const;
+
+    bool keysAreEqual(const Key& lhs, const Key& rhs) const {
+        return !comparator_(lhs, rhs) && !comparator_(rhs, lhs);
+    }
 
     SplayTreeNode* root_{nullptr};
     SplayTreeNode* leftMostNode_{nullptr};
@@ -678,9 +715,9 @@ template<typename Arg>
 std::pair<typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::iterator, bool>
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::insertUnique(Arg&& value) {
     const auto& key = KeyOfValue(value);
-    SplayTreeNode* placeToInsert = findPlaceToInsert(key);
+    SplayTreeNode* placeToInsert = findPlaceToInsertUnique(key);
 
-    if (placeToInsert && KeyOfValue(placeToInsert->value) == key) {
+    if (placeToInsert && keysAreEqual(KeyOfValue(placeToInsert->value), key)) {
         return {iterator(placeToInsert, root_), false};
     } else {
         auto newNode = innerInsert(std::forward<Arg>(value), placeToInsert);
@@ -699,7 +736,7 @@ template<typename Arg>
 typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::iterator
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::insertEqual(Arg&& value) {
     const auto& key = KeyOfValue(value);
-    SplayTreeNode* placeToInsert = findPlaceToInsert(key);
+    SplayTreeNode* placeToInsert = findPlaceToInsertEqual(key);
 
     auto newNode = innerInsert(std::forward<Arg>(value), placeToInsert);
     return iterator(newNode, root_);
@@ -720,9 +757,9 @@ std::pair<
     SplayTreeNode* newNode = createNode(std::forward<Args>(args)...);
     try {
         const auto& key = KeyOfValue(newNode->value);
-        SplayTreeNode* placeToInsert = findPlaceToInsert(key);
+        SplayTreeNode* placeToInsert = findPlaceToInsertUnique(key);
 
-        if (placeToInsert && KeyOfValue(placeToInsert->value) == key) {
+        if (placeToInsert && keysAreEqual(KeyOfValue(placeToInsert->value), key)) {
             destroyNode(newNode);
             return {iterator(placeToInsert, root_), false};
         } else {
@@ -751,7 +788,7 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::emplaceEqual(Args&&... ar
     SplayTreeNode* newNode = createNode(std::forward<Args>(args)...);
     try {
         const auto& key = KeyOfValue(newNode->value);
-        SplayTreeNode* placeToInsert = findPlaceToInsert(key);
+        SplayTreeNode* placeToInsert = findPlaceToInsertEqual(key);
 
         auto newNode = innerInsert(
             newNode->value,
@@ -1079,14 +1116,44 @@ template<
     typename Allocator
 >
 typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode*
-SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::findPlaceToInsert(
+SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::findPlaceToInsertUnique(
         const Key& key) const {
     SplayTreeNode* currentNode = root_;
     while (currentNode) {
         const auto& currentNodeKey = KeyOfValue(currentNode->value);
-        if (currentNodeKey == key) {
+        if (keysAreEqual(currentNodeKey, key)) {
             return currentNode;
         }
+        if (comparator_(key, currentNodeKey)) {
+            if (!currentNode->leftChild) {
+                return currentNode;
+            } else {
+                currentNode = currentNode->leftChild;
+            }
+        } else {
+            if (!currentNode->rightChild) {
+                return currentNode;
+            } else {
+                currentNode = currentNode->rightChild;
+            }
+        }
+    }
+    return currentNode;
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode*
+SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::findPlaceToInsertEqual(
+        const Key& key) const {
+    SplayTreeNode* currentNode = root_;
+    while (currentNode) {
+        const auto& currentNodeKey = KeyOfValue(currentNode->value);
         if (comparator_(key, currentNodeKey)) {
             if (!currentNode->leftChild) {
                 return currentNode;
@@ -1131,15 +1198,17 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerInsert(
     } else {
         const auto& key = KeyOfValue(newNode->value);
         newNode->parent = placeToInsert;
-        if (comparator_(KeyOfValue(placeToInsert->value), key)) {
-            placeToInsert->rightChild = newNode;
-            if (placeToInsert == rightMostNode_) {
-                rightMostNode_ = newNode;
-            }
-        } else {
+        if (comparator_(key, KeyOfValue(placeToInsert->value))) {
+            assert(!placeToInsert->leftChild);
             placeToInsert->leftChild = newNode;
             if (placeToInsert == leftMostNode_) {
                 leftMostNode_ = newNode;
+            }
+        } else {
+            assert(!placeToInsert->rightChild);
+            placeToInsert->rightChild = newNode;
+            if (placeToInsert == rightMostNode_) {
+                rightMostNode_ = newNode;
             }
         }
 
@@ -1238,6 +1307,32 @@ template<
     typename Compare,
     typename Allocator
 >
+SplayTree<Key, Value, KeyOfValue, Compare, Allocator>
+SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerSplit(
+        SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode* node) {
+    splay(node);
+
+    auto leftRoot = root_->leftChild;
+    root_->leftChild = nullptr;
+    leftRoot->parent = nullptr;
+    auto rightRoot = root_->rightChild;
+    root_->rightChild = nullptr;
+    rightRoot->parent = nullptr;
+
+    // TODO Looks not very nice and invokes unnecessary copies/moves,
+    //      should be rewritten.
+    *this = SplayTree(leftRoot, comparator_, nodeAllocator_);
+
+    return SplayTree(rightRoot, comparator_, nodeAllocator_);
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
 void SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerMerge(
         SplayTree<Key, Value, KeyOfValue, Compare, Allocator>&& rhs) {
     splay(rightMostNode_);
@@ -1264,8 +1359,8 @@ template<
 typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeNode*
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerFind(
         const Key& key) const {
-    SplayTreeNode* placeToInsert = findPlaceToInsert(key);
-    if (placeToInsert && KeyOfValue(placeToInsert->value) == key) {
+    SplayTreeNode* placeToInsert = findPlaceToInsertUnique(key);
+    if (placeToInsert && keysAreEqual(KeyOfValue(placeToInsert->value), key)) {
         return placeToInsert;
     } else {
         return nullptr;
