@@ -5,6 +5,7 @@
 #include <type_traits>
 #include <cstddef>
 #include <cassert>
+#include <stdexcept>
 #include <memory>
 
 namespace splay_tree {
@@ -13,7 +14,7 @@ template <
     typename Key,
     typename Value,
     typename KeyOfValue,
-    typename Compare,
+    typename Compare = std::less<Key>,
     typename Allocator = std::allocator<Value>
 >
 class SplayTree {
@@ -68,6 +69,8 @@ private:
         nodeAllocator_.deallocate(node, 1);
     }
 
+    // Non-recursive implementation, because the height of the splay tree is not
+    // guaranteed to be O(log(n)) in the worst case.
     void destroyTree(SplayTreeNode* root) noexcept {
         auto currentNode = root;
         while (currentNode) {
@@ -199,6 +202,8 @@ private:
 
     private:
         SplayTreeNode* node_;
+        // TODO Remove root_ field. This can be done if the end() iterator will
+        //      hold not nullptr but an auxiliary node containing special info.
         SplayTreeNode* root_;
     };
 
@@ -256,7 +261,11 @@ public:
     }
 
     const_iterator begin() const noexcept {
-        return const_iterator(rightMostNode_, root_);
+        return const_iterator(leftMostNode_, root_);
+    }
+
+    const_iterator cbegin() const noexcept {
+        return begin();
     }
     
     iterator end() noexcept {
@@ -267,6 +276,10 @@ public:
         return {nullptr, root_};
     }
 
+    const_iterator cend() const noexcept {
+        return end();
+    }
+
     reverse_iterator rbegin() noexcept {
         return reverse_iterator(end());
     }
@@ -275,12 +288,20 @@ public:
         return const_reverse_iterator(end());
     }
 
+    const_reverse_iterator crbegin() const noexcept {
+        return rbegin();
+    }
+
     reverse_iterator rend() noexcept {
         return reverse_iterator(begin());
     }
 
     const_reverse_iterator rend() const noexcept {
         return const_reverse_iterator(begin());
+    }
+
+    const_reverse_iterator crend() const noexcept {
+        return rend();
     }
 
     bool empty() const noexcept {
@@ -379,6 +400,28 @@ public:
         return oldSize - size();
     }
 
+    // Split/merge operations.
+    // TODO Implement split.
+    std::pair<SplayTree, SplayTree> split(iterator position);
+
+    std::pair<SplayTree, SplayTree> split(const_iterator position);
+
+    std::pair<SplayTree, SplayTree> split(const Key& key);
+
+    void mergeUnique(SplayTree&& rhs);
+
+    void mergeUnique(const SplayTree& rhs) {
+        auto temp = rhs;
+        mergeUnique(std::move(temp));
+    }
+
+    void mergeEqual(SplayTree&& rhs);
+
+    void mergeEqual(const SplayTree& rhs) {
+        auto temp = rhs;
+        mergeEqual(std::move(temp));
+    }
+
     // Find operations.
     iterator find(const key_type& key) {
         auto node = innerFind(key);
@@ -449,6 +492,8 @@ private:
 
     void innerErase(SplayTreeNode* node);
 
+    void innerMerge(SplayTree&& rhs);
+
     SplayTreeNode* innerFind(const key_type& key) const;
 
     SplayTreeNode* root_{nullptr};
@@ -458,8 +503,6 @@ private:
     Compare comparator_;
     NodeAllocator nodeAllocator_;
 };
-
-// TODO Write compare operators + swap function.
 
 template<
     typename Key,
@@ -481,9 +524,6 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::SplayTreeIterator<IsConst
             }
             node_ = currentNode;
         } else {
-            // TODO Because of the check currentNode->parent operator++ runs a
-            //      bit slower than the corresponding one in STL. Should think
-            //      about how to fix it (can a fake root help?)
             while (currentNode->parent &&
                     currentNode->parent->rightChild == currentNode) {
                 currentNode = currentNode->parent;
@@ -538,6 +578,102 @@ template<
     typename Compare,
     typename Allocator
 >
+inline bool operator==(
+        const SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& lhs,
+        const SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& rhs) {
+    return lhs.size() == rhs.size() &&
+        std::equal(lhs.cbegin, lhs.cend(), rhs.cbegin());
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+inline bool operator!=(
+        const SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& lhs,
+        const SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& rhs) {
+    return !(lhs == rhs);
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+inline bool operator<(
+        const SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& lhs,
+        const SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& rhs) {
+    return std::lexicographical_compare(
+        lhs.cbegin,
+        lhs.cend(),
+        rhs.cbegin(),
+        rhs.cend());
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+inline bool operator>(
+        const SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& lhs,
+        const SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& rhs) {
+    return rhs < lhs;
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+inline bool operator>=(
+        const SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& lhs,
+        const SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& rhs) {
+    return !(lhs < rhs);
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+inline bool operator<=(
+        const SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& lhs,
+        const SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& rhs) {
+    return rhs >= lhs;
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+inline void swap(
+        SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& lhs,
+        SplayTree<Key, Value, KeyOfValue, Compare, Allocator>& rhs) {
+    lhs.swap(rhs);
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
 template<typename Arg>
 std::pair<typename SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::iterator, bool>
 SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::insertUnique(Arg&& value) {
@@ -565,7 +701,7 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::insertEqual(Arg&& value) 
     const auto& key = KeyOfValue(value);
     SplayTreeNode* placeToInsert = findPlaceToInsert(key);
 
-    auto newNode = innerInsert(std::forward(value), placeToInsert);
+    auto newNode = innerInsert(std::forward<Arg>(value), placeToInsert);
     return iterator(newNode, root_);
 }
 
@@ -626,6 +762,42 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::emplaceEqual(Args&&... ar
         destroyNode(newNode);
         throw;
     }
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+void SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::mergeUnique(
+        SplayTree<Key, Value, KeyOfValue, Compare, Allocator>&& rhs) {
+    if (!comparator_(
+            KeyOfValue(rightMostNode_->value),
+            KeyOfValue(rhs.leftMostNode_->value))) {
+        throw std::runtime_error(
+            "Trying to merge two splay trees without the key separation property.");
+    }
+    innerMerge(std::move(rhs));
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+void SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::mergeEqual(
+        SplayTree<Key, Value, KeyOfValue, Compare, Allocator>&& rhs) {
+    if (comparator_(
+            KeyOfValue(rhs.leftMostNode_->value),
+            KeyOfValue(rightMostNode_->value))) {
+        throw std::runtime_error(
+            "Trying to merge two splay trees without the key separation property.");
+    }
+    innerMerge(std::move(rhs));
 }
 
 template<
@@ -1057,6 +1229,29 @@ void SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerErase(
 
     destroyNode(node);
     --numberOfNodes_;
+}
+
+template<
+    typename Key,
+    typename Value,
+    typename KeyOfValue,
+    typename Compare,
+    typename Allocator
+>
+void SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerMerge(
+        SplayTree<Key, Value, KeyOfValue, Compare, Allocator>&& rhs) {
+    splay(rightMostNode_);
+    assert(!root_->rightChild);
+
+    root_->rightChild = rhs.root_;
+    root_->rightChild->parent = root_;
+    rightMostNode_ = rhs.rightMostNode_;
+    numberOfNodes_ += rhs.numberOfNodes_;
+
+    rhs.root_ = nullptr;
+    rhs.leftMostNode_ = nullptr;
+    rhs.rightMostNode_ = nullptr;
+    rhs.numberOfNodes_ = 0;
 }
 
 template<
