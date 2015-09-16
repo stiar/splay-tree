@@ -202,8 +202,8 @@ private:
 
     private:
         SplayTreeNode* node_;
-        // TODO Remove root_ field. This can be done if the end() iterator will
-        //      hold not nullptr but an auxiliary node containing special info.
+        // TODO Remove the root_ field. This can be done if the end() iterator
+        //      holds an auxiliary node containing special info, not nullptr.
         SplayTreeNode* root_;
     };
 
@@ -250,7 +250,8 @@ private:
 public:
 
     // TODO Make noexcept.
-    // TODO What if default constuctors of Compare and Allocator take time?
+    // TODO What if default constuctors of Compare and Allocator are time
+    //      consuming?
     SplayTree(SplayTree&& rhs) :
             SplayTree() {
         swap(rhs);
@@ -493,7 +494,7 @@ public:
 
 private:
     // Splay and rotations.
-    // TODO When SplayTreeNode struct will be appropriately split, following
+    // TODO When SplayTreeNode struct is appropriately split, following
     //      methods will no longer depend on keys, values and template
     //      parameters and should be moved from here.
     SplayTreeNode* splay(SplayTreeNode* node);
@@ -816,7 +817,7 @@ void SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::mergeUnique(
             KeyOfValue()(rightMostNode_->value),
             KeyOfValue()(rhs.leftMostNode_->value))) {
         throw std::runtime_error(
-            "Trying to merge two splay trees without the key separation property.");
+            "Trying to merge two splay trees with no key separation property.");
     }
     innerMerge(std::move(rhs));
 }
@@ -834,7 +835,7 @@ void SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::mergeEqual(
             KeyOfValue()(rhs.leftMostNode_->value),
             KeyOfValue()(rightMostNode_->value))) {
         throw std::runtime_error(
-            "Trying to merge two splay trees without the key separation property.");
+            "Trying to merge two splay trees with no key separation property.");
     }
     innerMerge(std::move(rhs));
 }
@@ -1321,7 +1322,7 @@ SplayTree<Key, Value, KeyOfValue, Compare, Allocator>::innerSplit(
     root_->rightChild = nullptr;
     rightRoot->parent = nullptr;
 
-    // TODO Looks not very nice and invokes unnecessary copies/moves,
+    // TODO Doesn't look nice and invokes unnecessary copies/moves,
     //      should be rewritten.
     *this = SplayTree(leftRoot, comparator_, nodeAllocator_);
 
