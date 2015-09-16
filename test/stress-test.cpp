@@ -1,14 +1,13 @@
 #include "gtest/gtest.h"
-#include "splay-tree/splay-tree.h"
+#include "splay-tree/set.h"
+#include "splay-tree/multiset.h"
 
 #include <set>
 #include <random>
 
-using namespace splay_tree;
-
 // Test for insert, erase, count, lower_bound, upper_bound, size.
 TEST(splay_tree_test, stressTestWithSet) {
-    SplayTree<int, int, int> splayTreeSet;
+    splay_tree::set<int> splayTreeSet;
     std::set<int> stlSet;
 
     constexpr unsigned int NUMBER_OF_ITERATIONS = 10000;
@@ -42,7 +41,7 @@ TEST(splay_tree_test, stressTestWithSet) {
                 {
                     int key = randomInt(mt);
                     auto stlSetInsertResult = stlSet.insert(key);
-                    auto splayTreeInsertResult = splayTreeSet.insertUnique(key);
+                    auto splayTreeInsertResult = splayTreeSet.insert(key);
                     EXPECT_EQ(
                         std::distance(stlSet.begin(), stlSetInsertResult.first),
                         std::distance(
@@ -101,7 +100,7 @@ TEST(splay_tree_test, stressTestWithSet) {
 
 // Test for insert, erase, count, lower_bound, upper_bound, size.
 TEST(splay_tree_test, stressTestWithMultiSet) {
-    SplayTree<int, int, int> splayTreeMultiSet;
+    splay_tree::multiset<int> splayTreeMultiSet;
     std::multiset<int> stlMultiSet;
 
     constexpr unsigned int NUMBER_OF_ITERATIONS = 10000;
@@ -136,7 +135,7 @@ TEST(splay_tree_test, stressTestWithMultiSet) {
                     int key = randomInt(mt);
                     auto stlMultiSetInsertResult = stlMultiSet.insert(key);
                     auto splayTreeInsertResult =
-                        splayTreeMultiSet.insertEqual(key);
+                        splayTreeMultiSet.insert(key);
                     EXPECT_EQ(
                         std::distance(
                             stlMultiSet.begin(),

@@ -1,12 +1,13 @@
 #include "gtest/gtest.h"
 #include "splay-tree/splay-tree.h"
+#include "splay-tree/key-of-value.h"
 
 #include <string>
 
 using namespace splay_tree;
 
 TEST(splay_tree_test, insertUnique) {
-    SplayTree<int, int, int> set;
+    SplayTree<int, int, Identity> set;
     auto val1 = set.insertUnique(1);
     EXPECT_EQ(1, set.count(1));
     auto val1Copy = set.insertUnique(1);
@@ -22,7 +23,7 @@ TEST(splay_tree_test, insertUnique) {
 }
 
 TEST(splay_tree_test, emplaceUnique) {
-    SplayTree<std::string, std::string, std::string> set;
+    SplayTree<std::string, std::string, Identity> set;
     const std::string a("a");
     const std::string b("b");
     auto val1 = set.emplaceUnique(a.c_str());
@@ -40,7 +41,7 @@ TEST(splay_tree_test, emplaceUnique) {
 }
 
 TEST(splay_tree_test, erase) {
-    SplayTree<int, int, int> set;
+    SplayTree<int, int, Identity> set;
     set.insertUnique(1);
     set.insertUnique(3);
     set.insertUnique(5);
@@ -56,7 +57,7 @@ TEST(splay_tree_test, erase) {
 }
 
 TEST(splay_tree_test, customComparator) {
-    SplayTree<int, int, int, std::greater<int>> set;
+    SplayTree<int, int, Identity, std::greater<int>> set;
     set.insertUnique(1);
     set.insertUnique(2);
 
@@ -65,7 +66,7 @@ TEST(splay_tree_test, customComparator) {
 }
 
 TEST(splay_tree_test, construction) {
-    SplayTree<int, int, int> set1;
+    SplayTree<int, int, Identity> set1;
     set1.insertUnique(3);
     set1.insertUnique(4);
     set1.insertUnique(1);
@@ -74,7 +75,7 @@ TEST(splay_tree_test, construction) {
     EXPECT_EQ(1, set1.count(3));
     EXPECT_EQ(1, set1.count(4));
 
-    SplayTree<int, int, int> set2(set1);
+    SplayTree<int, int, Identity> set2(set1);
     EXPECT_EQ(1, set2.count(1));
     EXPECT_EQ(0, set2.count(2));
     EXPECT_EQ(1, set2.count(3));
@@ -82,7 +83,7 @@ TEST(splay_tree_test, construction) {
 }
 
 TEST(splay_tree_test, split) {
-    SplayTree<int, int, int> set1;
+    SplayTree<int, int, Identity> set1;
     set1.insertEqual(1);
     set1.insertEqual(3);
     set1.insertEqual(4);
@@ -113,11 +114,11 @@ TEST(splay_tree_test, split) {
 }
 
 TEST(splay_tree_test, mergeUnique) {
-    SplayTree<int, int, int> set1;
+    SplayTree<int, int, Identity> set1;
     set1.insertUnique(1);
     set1.insertUnique(3);
     set1.insertUnique(4);
-    SplayTree<int, int, int> set2;
+    SplayTree<int, int, Identity> set2;
     set2.insertUnique(6);
     set2.insertUnique(7);
     set2.insertUnique(9);
@@ -146,12 +147,12 @@ TEST(splay_tree_test, mergeUnique) {
 }
 
 TEST(splay_tree_test, mergeEqual) {
-    SplayTree<int, int, int> set1;
+    SplayTree<int, int, Identity> set1;
     set1.insertEqual(1);
     set1.insertEqual(1);
     set1.insertEqual(2);
     set1.insertEqual(4);
-    SplayTree<int, int, int> set2;
+    SplayTree<int, int, Identity> set2;
     set2.insertEqual(5);
     set2.insertEqual(4);
     set2.insertEqual(4);
